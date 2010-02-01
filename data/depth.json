@@ -1,0 +1,11 @@
+[[[{
+"bear":1,"cat":2,"dogaloo":3,"elephant":{
+"xaardvark":109,"xaasldkfjaaab":118,"xcalibur____":127,"xdelightblah":136,"x1":145,"x2":154,"x3":163,"x4":172,"x5":181,"xe":[
+1,2,3, true, false, null]},
+"q":1, "y":2, "f":{
+}}],
+[
+"a","b","c",[[
+1]],
+{
+"f":1234}]]]

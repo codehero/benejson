@@ -1,0 +1,10 @@
+# Copyright (c) 2010 David Bender assigned to Benegon Enterprises LLC
+# See the file LICENSE for full license information.
+
+Import('*')
+
+lib_env = lib_env.Clone()
+
+lt = lib_env.SharedLibrary('benejson', Split('benejson.c pull.cpp'))
+li = lib_env.Install(bin_env.LibDest, lt)
+lh = lib_env.Install(lib_env.IncDest + "/benejson", Split('benejson.h pull.hh'))

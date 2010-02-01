@@ -1,0 +1,88 @@
+BeneJSON Library
+----------------
+
+SUMMARY
+
+Abstract:
+	BeneJSON is a JSON input library written with a core written in C and
+	distributed with a high level C++ interface. The core is meant to be
+	fast, minimal and easy to integrate directly into source.
+
+Current release information:
+	Date: January 31, 2010
+	Version: 0.8.0
+	Type: Alpha, User Interface Release Candidate
+
+Current version dependencies:
+  -Usable <stdint.h>
+	-Optional <wchar.h>, <math.h>
+	-C++ for pull parsing
+	-scons building environment (http://www.scons.org)
+	-POSIX compliant environment to build test cases
+
+DESCRIPTION
+
+Use cases:
+	-Stream parsing
+	 -Memory constrained embedded systems
+	 -Web services handling JSON input
+	 -Configuration file reading
+	-One by one pull parsing
+	-Basis for scripting language bindings.
+
+	-The author will not provide functions for DOM-like tree generation,
+	 though users are certainly welcome to write their own.
+
+Goals:
+  -Full verification of JSON spec
+	-Additional support of interpreting NaN, +/- Infinity values
+	-Provide the BEST solution for the needs of embedded systems
+	-Provide a COMPETITIVE solution for uses in other computing domains
+	-Easy to integrate
+	 -Direct source integration
+	 -Dynamic library
+	 -Basis of scripting library binding
+	 -Use in callback based architectures or directly read results on return
+
+	-Provide C based core
+	 -Operates in both callback and return type modes using the same function
+	 -ZERO use of global variables, including malloc calls
+	 -Zero memory leaks by design
+	 -Inhibit DoS attacks by limiting depth and avoiding eager evaluations
+	 -User can provide an alphabetically sorted array of character strings
+	  against which the library will match map keys. The library will tag
+		each value with the index of user's array, thus speeding up value
+		identification within maps.
+
+	-Provide high level C++ interface
+	 -Simplified usage of C core
+	 -ZERO use of malloc and global variables in shipped code
+	 -Streaming pull parsing API
+	 -Verify input's syntactic properties
+	 -Easy integration with external input sources, I/O libraries
+
+
+Future Goals (after 1.0.0):
+  -Provide support for different build systems (make, Visual studio)
+  -Provide JSON formatted output routines
+	 -Pretty formatting
+	 -Compact formatting
+	 -Aligned string formatting
+	-Create patches to C core for parsing arbitrary precision numbers
+
+NOTES
+
+Version 0.8.0 Known Bugs/TODO:
+
+1) UTF-8 is not yet fully verified in strings
+2) UTF-16 not properly handled if fragmented
+3) pull.hh:Consume() is not handled for fragmenting cases yet
+4) Key enum mappings do not yet work with unescaped chars, UTF-8 mapping
+5) No support for wide char key enums
+6) Complete regression and verification programs
+7) Add more test cases for said regression/verification
+8) PullParser::FileOffset not implemented
+9) Error reporting in PullParser is incomplete
+
+Copyright (c) 2010 David Bender assigned to Benegon Enterprises LLC
+See the file LICENSE for full license information.

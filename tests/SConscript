@@ -1,0 +1,15 @@
+# Copyright (c) 2010 David Bender assigned to Benegon Enterprises LLC
+# See the file LICENSE for full license information.
+
+Import('*')
+
+step = bin_env.Program("step", Split('stepbystep.c'), LIBS=Split("benejson m"));
+json = bin_env.Program("jsontest", Split('jsontest.c'), LIBS=Split("benejson m"));
+jbuff = bin_env.Program("jbuff", Split('jsonbuff.c'), LIBS=Split("benejson m"));
+
+pulltest = bin_env.Program("pulltest", Split('pulltest.cpp posix.cpp'), LIBS=Split("benejson m"));
+
+bin_env.Install(bin_env.BinDest, step)
+bin_env.Install(bin_env.BinDest, json)
+bin_env.Install(bin_env.BinDest, jbuff)
+bin_env.Install(bin_env.BinDest, pulltest)
