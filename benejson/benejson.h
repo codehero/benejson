@@ -10,6 +10,9 @@
 
 #include <stdint.h>
 
+/* For memcpy */
+#include <string.h>
+
 
 /************************************************************************/
 /* Code Configuration. */
@@ -86,16 +89,7 @@ enum {
 	BNJ_OBJ_BEGIN = 3,
 
 	/** @brief Minimum value for string. */
-	BNJ_STRING = 4,
-
-	/** @brief UTF-8 string. */
-	BNJ_UTF_8 = 4,
-
-	/** @brief String contains characters in BMP. */
-	BNJ_UTF_16 = 5,
-
-	/** @brief String contains characters in Extended plane. */
-	BNJ_UTF_32 = 6
+	BNJ_STRING = 4
 };
 
 
@@ -186,10 +180,14 @@ enum {
 	/** @brief Missing colon in key:value pair. */
 	BNJ_ERR_MISSING_COLON,
 
+	/** @brief Invalid or unexpected UTF-8 character. */
+	BNJ_ERR_UTF_8,
+
 	/** @brief Number of errors defined. */
-	BNJ_ERROR_COUNT = BNJ_ERR_MISSING_COLON - BNJ_ERROR_MASK + 1
+	BNJ_ERROR_COUNT = BNJ_ERR_UTF_8 - BNJ_ERROR_MASK + 1
 };
 
+#define BNJ_EMPTY_CP 0x80000000
 
 /************************************************************************/
 /* Type and struct definitions.. */
@@ -218,33 +216,45 @@ typedef struct bnj_ctx_s{
 } bnj_ctx;
 
 
-/** @brief Holds parsed JSON value. */
+/** @brief Holds parsed JSON value.
+ * Across fragments, the parser must preserve fields marked with [PAF].*/
 typedef struct bnj_val_s {
+	/** @brief Value type. [PAF] */
+	uint8_t type;
+
+	/** @brief Key's length of ASCII character data. 
+	 * No key should be more than 255 chars long! */
+	uint8_t key_length;
+
+	/** @brief Numeric key id if key_set defined. [PAF] */
+	uint16_t key_enum;
+
 	/** @brief Key begins at offset from buffer. */
 	uint16_t key_offset;
-
-	/** @brief Key's length of MB character data.  */
-	uint16_t key_length;
 
 	/** @brief String value begins at offset from buffer. */
 	uint16_t strval_offset;
 
-	/** @brief String value's character count. */
-	uint16_t strval_length;
+	/** @brief When type is BNJ_UTF_*, count of code points between [0, 128). */
+	uint16_t cp1_count;
 
-	/** @brief Numeric significand fragment.
-	 * NOTE ACTUAL SIZE is ARCHITECTURE DEPENDENT! */
+	/** @brief When type is BNJ_UTF_*, count of code points between [128, 2K). */
+	uint16_t cp2_count;
+
+	/** @brief When type is BNJ_UTF_*, count of code points between [2K, 65K). */
+	uint16_t cp3_count;
+
+	/** @brief Valid when parsing numeric, holds the present exponent value [PAF].
+	 * Internal use only:
+	 *  When type is BNJ_UTF_*, count of code points between [65K, 1.1M). */
+	int16_t exp_val;
+
+	/** @brief Numeric significand fragment. [PAF]
+	 * NOTE ACTUAL SIZE is ARCHITECTURE DEPENDENT! MUST BE AT LEAST 32bit
+	 * Internal use only:
+	 *  When type is BNJ_UTF_*, holds fragmented code point value. */
 	SIGNIFICAND significand_val;
 
-	/** @brief Valid when parsing numeric, holds the present exponent value.
-	 * Internal use only: When type is BNJ_UTF_*, the raw UTF-8 encoded length. */
-	int32_t exp_val;
-
-	/** @brief Numeric key id if key_set defined. */
-	uint16_t key_enum;
-
-	/** @brief Value type. */
-	uint8_t type;
 } bnj_val;
 
 
@@ -292,15 +302,26 @@ typedef struct bnj_state_s{
 	/** @brief How many digits preceded the decimal. -1 if no decimal. */
 	int32_t _decimal_offset;
 
-	/** @brief Holds value state between calls. */
-	bnj_val _save;
-
 	/** @brief Supremum of key set tracking. */
 	uint16_t _key_set_sup;
 
 	/** @brief Internal key length counter. */
 	uint16_t _key_len;
 
+	/** @brief PAF key enum */
+	uint16_t _paf_key_enum;
+
+	/** @brief PAF type */
+	uint16_t _paf_type;
+
+	/** @brief PAF exp_val */
+	int16_t _paf_exp_val;
+
+	/** @brief PAF last fragmented code point. */
+	uint16_t _cp_fragment;
+
+	/** @brief PAF significand value. */
+	SIGNIFICAND _paf_significand_val;
 
 	/* Initialized by bnj_state_init. */
 
@@ -332,57 +353,96 @@ bnj_state* bnj_state_init(bnj_state* st, uint32_t* state_buffer, uint32_t stack_
  *  @return Where parsing ended. */
 const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len);
 
+/** @brief Helper function for fragment management.
+ *  @param frag Fragmented key:value.
+ *  @param buffer Input buffer that was passed to bnj_parse.
+ *  @param len Size of input buffer; on return, contains number of free bytes
+ *  following the return value.
+ *  @return First empty byte in the buffer. */
+uint8_t* bnj_fragshift(bnj_val* frag, uint8_t* buffer, uint32_t* len);
 
-/* Value accessors. */
+
+/* String length counting functions. */
+
+/** @brief Get number of code points (NOT necessarily number of "characters")
+ *  @param src BNJ value containing BNJ_STRING string data.
+ *  @return code point count. */
+unsigned bnj_cpcount(const bnj_val* src);
+
+/** @brief Get UTF-8 string value length count.
+ *  @param src BNJ value containing BNJ_STRING string data.
+ *  @return UTF-8 encoded string length. */
+unsigned bnj_strlen8(const bnj_val* src);
+
+/** @brief Get string value length.
+ *  @param src BNJ value containing BNJ_STRING string data.
+ *  @return UTF-16 encoded string length. */
+unsigned bnj_strlen16(const bnj_val* src);
+
+/** @brief Get string value length.
+ *  @param src BNJ value containing BNJ_STRING string data.
+ *  @return UTF-32 encoded string length. */
+unsigned bnj_strlen32(const bnj_val* src);
+
+/** @brief Determine whether value was incompletely read.
+ *  @param src Value in question
+ *  @return 1 if incomplete, 0 if not. */
+unsigned bnj_incomplete(const bnj_state* state, const bnj_val* src);
+
+/* String copy functions. */
+
+/** @brief Copy key to destination buffer.
+ *  @param dst Where to copy data. Must hold at least src->string_val + 1 chars.
+ *  @param src BNJ value containing BNJ_STRING string data.
+ *  @param buff buffer containing string data.
+ *  @return pointer to dst's null terminator. NULL if there is no key. */
+char* bnj_stpkeycpy(char* dst, const bnj_val* src, const uint8_t* buff);
 
 /** @brief Copy JSON encoded string to normal UTF-8 destination.
  *  @param dst Where to copy data. Must hold at least src->string_val + 1 chars.
- *  @param src BNJ value containing BNJ_UTF_8 string data.
+ *  @param src BNJ value containing BNJ_STRING string data.
  *  @param buff buffer containing string data.
- *  @param which If 0, then copy string value; otherwise copy key.
  *  @return pointer to dst's null terminator. NULL if src type incorrect. */
-char* bnj_stpcpy(char* dst, const bnj_val* src, const uint8_t* buff, int which);
+uint8_t* bnj_stpcpy8(uint8_t* dst, const bnj_val* src, const uint8_t* buff);
 
 /** @brief Copy encoded string to normal UTF-8 destination, with length limit.
  *  @param dst Where to copy data. Must hold at least src->string_val + 1 chars.
- *  @param src BNJ value containing BNJ_UTF_8 string data.
+ *  @param src BNJ value containing BNJ_STRING string data.
  *  @param len Character length including null terminator.
  *  @param buff buffer containing string data.
- *  @param which If 0, then copy string value; otherwise copy key.
  *  @return pointer to first character past null terminator (end of string). */
-char* bnj_stpncpy(char* dst, const bnj_val* src, size_t len,
-	const uint8_t* buff, int which);
+uint8_t* bnj_stpncpy8(uint8_t* dst, const bnj_val* src, size_t len,
+	const uint8_t* buff);
 
-/** @brief Compare JSON encoded string to normal string.
- *  @param s1 Normal string.
- *  @param s2 BNJ value containing BNJ_UTF_8 string data.
- *  @param buff buffer containing string data.
- *  @param which If 0, then compare string value; otherwise key value.
- *  @return negative if s1 < s2, 0 is s1 == s2, positive if s1 > s2.
- *  magnitude of return value is first char in str that does not match. */
-int bnj_strcmp(const char* s1, const bnj_val* val, const uint8_t* buff,
-	int which);
+/** @brief Utility copy function; really for INTERNAL or ADVANCED use.
+ *  @param dst Where to store UTF-8 output.
+ *  @param destlen How many UTF-8 bytes to store.
+ *  MUST NOT EXCEED PREDICTED UTF-8 LENGTH IN BUFF! (you've been warned).
+ *  @param buff Source data; Upon return points to where parsing stopped.
+ *  @return Pointer to next unwritten byte after dst. */
+uint8_t* bnj_json2utf8(uint8_t* dst, size_t destlen, const uint8_t** buff);
 
 #ifdef BNJ_WCHAR_SUPPORT
 
 /** @brief Copy JSON encoded string to wide character string.
  *  @param dst Where to copy data. Must hold at least src->string_val + 1 chars.
- *  @param src BNJ value containing BNJ_UTF_8 string data.
+ *  @param src BNJ value containing BNJ_STRING string data.
  *  @param buff buffer containing string data.
  *  @return pointer to dst's null terminator. */
 wchar_t* bnj_wcpcpy(wchar_t* dst, const bnj_val* src, const uint8_t* buff);
 
 /** @brief Copy encoded string to wide character string, with length limit.
  *  @param dst Where to copy data. Must hold at least src->string_val + 1 chars.
- *  @param src BNJ value containing BNJ_UTF_8 string data.
+ *  @param src BNJ value containing BNJ_STRING string data.
  *  @param len Character length including null terminator.
  *  @param buff buffer containing string data.
  *  @return pointer to first character past null terminator (end of string). */
-wchar_t* bnj_wcpncpy(wchar_t* dst, const bnj_val* src, size_t len, const uint8_t* buff);
+wchar_t* bnj_wcpncpy(wchar_t* dst, const bnj_val* src, size_t len,
+	const uint8_t* buff);
 
 /** @brief Compare JSON encoded string to wide character string.
  *  @param s1 Normal string.
- *  @param s2 BNJ value containing BNJ_UTF_8 string data.
+ *  @param s2 BNJ value containing BNJ_STRING string data.
  *  @param buff buffer containing string data.
  *  @return negative if s1 < s2, 0 is s1 == s2, positive if s1 > s2.
  *  magnitude of return value is first char in str that does not match. */
@@ -407,17 +467,54 @@ float bnj_float(const bnj_val* src);
 /* Inline functions. */
 /************************************************************************/
 
-inline char* bnj_stpcpy(char* dst, const bnj_val* src, const uint8_t* buff,
-	int which)
-{
-	return bnj_stpncpy(dst, src, (which ? src->key_length: src->strval_length)+1,
-		buff, which);
+inline unsigned bnj_cpcount(const bnj_val* src){
+	return src->cp1_count + src->cp2_count + src->cp3_count
+		+ (unsigned)(src->exp_val);
 }
+
+inline unsigned bnj_incomplete(const bnj_state* state, const bnj_val* src){
+	return ((src->type & (BNJ_VFLAG_VAL_FRAGMENT | BNJ_VFLAG_KEY_FRAGMENT))
+		|| (state->stack[state->depth] & BNJ_VAL_INCOMPLETE));
+}
+
+inline unsigned bnj_val_type(const bnj_val* src){
+	return src->type & BNJ_TYPE_MASK;
+}
+
+inline char* bnj_stpkeycpy(char* dst, const bnj_val* src, const uint8_t* buff){
+	if(src->key_length){
+		memcpy(dst, buff + src->key_offset, src->key_length);
+		dst[src->key_length] = '\0';
+		return dst + src->key_length;
+	}
+	return NULL;
+}
+
+inline unsigned bnj_strlen8(const bnj_val* src){
+	return src->cp1_count + 2 * src->cp2_count + 3 * src->cp3_count
+		+ 4 * (unsigned)(src->exp_val);
+}
+
+inline unsigned bnj_strlen16(const bnj_val* src){
+	return 2 * (src->cp1_count + src->cp2_count + src->cp3_count)
+		+ 4 * (unsigned)(src->exp_val);
+}
+
+inline unsigned bnj_strlen32(const bnj_val* src){
+	return 4 * bnj_cpcount(src);
+}
+
+inline uint8_t* bnj_stpcpy8(uint8_t* dst, const bnj_val* src,
+	const uint8_t* buff)
+{
+	return bnj_stpncpy8(dst, src, bnj_strlen8(src) + 1, buff);
+}
+
 
 #ifdef BNJ_WCHAR_SUPPORT
 
 inline wchar_t* bnj_wcpcpy(wchar_t* dst, const bnj_val* src, const uint8_t* buff){
-	return bnj_wcpncpy(dst, src, src->strval_length + 1, buff);
+	return bnj_wcpncpy(dst, src, bnj_strlen16(src) + 1, buff);
 }
 
 #endif

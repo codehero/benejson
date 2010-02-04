@@ -23,8 +23,39 @@ static const char* s_error_msgs[BNJ_ERROR_COUNT] = {
 	"Invalid character",
 	"Invalid char in reserved word",
 	"List/map mismatch",
-	"Missing colon"
+	"Missing colon",
+	"Invalid UTF-8 char"
 };
+
+static const char* s_type_strings[] = {
+	"numeric",
+	"special",
+	"array",
+	"map",
+	"string"
+};
+
+static void s_throw_key_error(const BNJ::PullParser& p, unsigned key_enum){
+	const bnj_val& val = p.GetValue();
+	char buffer[1024];
+	char* x;
+	x = stpcpy(buffer, "Key mismatch: expected ");
+	x = stpcpy(x, p.c_state().user_ctx->key_set[key_enum]);
+	x = stpcpy(x, ", found ");
+	bnj_stpkeycpy(x, &val, p.Buff());
+	throw BNJ::PullParser::input_error(buffer, p.FileOffset(val));
+}
+
+static void s_throw_type_error(const BNJ::PullParser& p, unsigned type){
+	const bnj_val& val = p.GetValue();
+	char buffer[1024];
+	char* x;
+	x = stpcpy(buffer, "Type mismatch: expected ");
+	x = stpcpy(x, s_type_strings[type]);
+	x = stpcpy(x, ", got ");
+	x = stpcpy(x, s_type_strings[val.type & BNJ_TYPE_MASK]);
+	throw BNJ::PullParser::input_error(buffer, p.FileOffset(val));
+}
 
 BNJ::PullParser::Reader::~Reader() throw(){
 }
@@ -53,6 +84,68 @@ BNJ::PullParser::PullParser(unsigned maxdepth, uint32_t* stack_space)
 BNJ::PullParser::~PullParser(){
 }
 
+unsigned BNJ::PullParser::Consume8(char* dest, unsigned destlen,
+	unsigned key_enum)
+{
+	if(dest && _val_idx < _val_len){
+		bnj_val& val = _valbuff[_val_idx];
+		if(_utf8_remaining){
+			if(key_enum != 0xFFFFFFFF && val.key_enum != key_enum)
+				s_throw_key_error(*this, key_enum);
+			if((val.type & BNJ_TYPE_MASK) != BNJ_STRING)
+				s_throw_type_error(*this, BNJ_STRING);
+
+			const uint8_t* x = Buff();
+			if(destlen >= _utf8_remaining + 1 || !dest){
+				/* Can fit entire string fragment in destination. */
+				uint8_t* pos = bnj_json2utf8((uint8_t*)dest, _utf8_remaining, &x);
+
+				/* If value is not a fragment, then have read the whole value. */
+				if(!(val.type & BNJ_VFLAG_VAL_FRAGMENT)){
+					/* Finished value. */
+					++_val_idx;
+
+					/* Null terminate and return. */
+					*pos = '\0';
+					return pos - (uint8_t*)dest;
+				}
+
+				/* Just finished reading data from fragment, so must be at end
+				 * of unparsed data. Refill the entire buffer. */
+				FillBuffer(_len);
+
+				/* Only try to finish current value. */
+				_pstate.v = _valbuff;
+				_pstate.vlen = 1;
+
+				/* Parse data. Advance. */
+				const uint8_t* res = bnj_parse(&_pstate, _buffer + _first_unparsed,
+					_first_empty - _first_unparsed);
+				_first_unparsed = res - _buffer;
+
+				/* If there are chars still remaining, then keep this value. */
+				_val_idx = 0;
+				_utf8_remaining = bnj_strlen8(_valbuff + _val_idx);
+				_val_len = (_utf8_remaining) ? 1 : 0;
+
+				/* FIXME: Loop to fill up user buffer? */
+			}
+			else {
+				/* Read as many bytes as possible. Subtract what was read. */
+				uint8_t* pos = bnj_json2utf8((uint8_t*)dest, destlen - 1, &x);
+				/* Update bytes remaining in the input buffer. */
+				_offset += x - Buff();
+
+				/* Return number of bytes written to output. */
+				unsigned diff = pos - (uint8_t*)dest;
+				_utf8_remaining -= diff;
+				return diff;
+			}
+		}
+	}
+	return 0;
+}
+
 void BNJ::PullParser::Begin(uint8_t* buffer, unsigned len, Reader* reader) throw(){
 	_buffer = buffer;
 	_len = len;
@@ -67,6 +160,7 @@ void BNJ::PullParser::Begin(uint8_t* buffer, unsigned len, Reader* reader) throw
 
 	/* Initialize here since _offset uses this as a default. */
 	_first_unparsed = 0;
+	_utf8_remaining = 0;
 
 	_parser_state = ST_BEGIN;
 }
@@ -87,209 +181,141 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 		return _parser_state;
 	}
 
-	/* Return data from buffer if available. */
-	++_val_idx;
-	if(_val_idx < _val_len){
-		return ST_DATUM;
-	}
-
-	/* Return 0 elements if pullparser depth lags parser depth.
-	 * Indicate type of structure. */
-	if(_depth < _pstate.depth){
-		++_depth;
-		_parser_state = (_pstate.stack[_depth] & BNJ_OBJECT) ? ST_MAP : ST_LIST;
-		return _parser_state;
-	}
-	else if(_depth > _pstate.depth){
-		unsigned st = _pstate.stack[_depth];
-		--_depth;
-		_parser_state = (st & BNJ_OBJECT) ? ST_ASCEND_MAP : ST_ASCEND_LIST;
-		return _parser_state;
-	}
-
-	_ctx.key_set = key_set;
-	_ctx.key_set_length = key_set_length;
-
-	/* Assign output values. */
-	_pstate.v = _valbuff;
-	_pstate.vlen = 4;
-
-	/* Number of values read so far. */
-	unsigned vals_read = 0;
-	unsigned lastkeylen = 0;
-	unsigned laststrlen = 0;
-	unsigned lastoffset = _len;
 	unsigned end_bound = _len;
-	int bytes_read;
 
-	/* Assume offset starts at first unparsed. */
-	_offset = _first_unparsed;
+	if(_val_idx < _val_len){
+		const bnj_val* tmp = _valbuff + _val_idx;
+		/* If value remaining then. */
+		if(_val_idx < _val_len - 1){
+			++_val_idx;
+			++tmp;
 
-	/* Fill all empty bytes. At most will do this twice per Pull() call. */
-reread:
-	if(READ_ST == _state){
-		_first_empty %= _len;
-		_first_unparsed = _first_empty;
-		while(_first_empty < end_bound){
-			bytes_read = _reader->Read(_buffer + _first_empty, end_bound - _first_empty);
+			/* If not last value then just return. */
+			if(_val_idx < _val_len - 1)
+				return ST_DATUM;
 
-			/* FIXME Handle signal interruption. */
-			if(bytes_read < 0)
-				throw std::runtime_error("PullParser::Pull Read error.");
+			/* If value is complete just return. */
+			if(!bnj_incomplete(&_pstate, tmp))
+				return ST_DATUM;
 
-			if(0 == bytes_read)
-				break;
-			_first_empty += bytes_read;
+			/* If string value then Consume*() will handle fragmentation. */
+			if(bnj_val_type(tmp) == BNJ_STRING){
+				/* Remember number of UTF-8 characters.
+				 * Consume*() will need this initialized. */
+				_utf8_remaining = bnj_strlen8(tmp);
+				return ST_DATUM;
+			}
+
+			/* Move fragment to buffer start so FillBuffer() appends. */
+			uint8_t* start = bnj_fragshift(_pstate.v, _buffer, &end_bound);
+			_first_unparsed = 0;
+			_first_empty = start - _buffer;
 		}
-		_state = PARSE_ST;
+		else if(bnj_incomplete(&_pstate, tmp)){
+			/* If user ignored fragmented string just parse through it.
+			 * ONLY STRINGS should make it here.
+			 * Call Consume() until nothing left.. */
+			assert(bnj_val_type(tmp) == BNJ_STRING);
+			while(Consume8(NULL, 0));
+		}
+
+		/* Time to read more data... */
+		_state = READ_ST;
 	}
-
-	/* Parse data. Adjust value read count. */
-	const uint8_t* res = bnj_parse(&_pstate, _buffer + _first_unparsed,
-		_first_empty - _first_unparsed);
-
-	if(_pstate.flags & BNJ_ERROR_MASK){
-		throw input_error(s_error_msgs[_pstate.flags - BNJ_ERROR_MASK], 0);
-	}
-
-	/* Assume all values are complete. If last is incomplete, decrement later. */
-	vals_read += _pstate.vi;
-
-	/* When coming from fragment, lastkeylen and laststrlen MAY be nonzero. */
-	_pstate.v[0].key_length += lastkeylen;
-	_pstate.v[0].strval_length += laststrlen;
-	if(lastoffset != _len)
-		_pstate.v[0].key_offset = lastoffset;
-
-	uint_fast8_t t = _pstate.vi ? _pstate.v[_pstate.vi - 1].type : 0;
-
-	/* Check if last value is fragmented. */
-	/* If key fragmentation, copy partial key to buffer start. */
-	if(t & (BNJ_VFLAG_KEY_FRAGMENT | BNJ_VFLAG_VAL_FRAGMENT)){
-		unsigned offset;
-		unsigned mlen;
-
-		/* Must have read at least one value. */
-		assert(_pstate.vi);
-
-		/* Partial value, so decrement vals_read. */
-		--vals_read;
-
-		/* If value fragmentation, copy partial value to beginning of buffer. */
-		if(t & BNJ_VFLAG_VAL_FRAGMENT){
-			laststrlen = _pstate.v[_pstate.vi - 1].strval_length;
-			mlen = laststrlen;
-			offset = _pstate.v[_pstate.vi - 1].strval_offset;
-		}
-		else{
-			lastkeylen = _pstate.v[_pstate.vi - 1].key_length;
-			mlen = lastkeylen;
-			offset = _pstate.v[_pstate.vi - 1].key_offset;
-		}
-
-		/* Make sure there is enough space at the beginning of the buffer. */
-		if(mlen < _first_unparsed){
-			memmove(_buffer, _buffer + offset, mlen);
-			_first_empty = mlen;
-		}
-		/* ELSE Just return completed values. */
-		else{
-			/* FIXME */
-			throw std::runtime_error("Internal error!");
-		}
-
-	}
-	/* ELSE If key complete but value not read yet, just reiterate. */
-	else if(_pstate.stack[_pstate.depth] & (BNJ_VAL_INCOMPLETE)){
-		/* Partial [key:]value, so decrement vals_read. */
-		if(vals_read){
-			--vals_read;
-			/* Save key length, offset here since this is not counted as "COMPLETED". */
-			lastkeylen = _pstate.v[_pstate.vi - 1].key_length;
-			if(lastkeylen)
-				lastoffset = _first_unparsed + _pstate.v[_pstate.vi - 1].key_offset;
-		}
-	}
-	/* ELSE Input buffer not filled, continue. */
-	else if((vals_read < 4 && _pstate.depth == _depth) && BNJ_SUCCESS != _pstate.flags){
-		/* Just read more values. */
-	}
-	/* OTHERWISE SUCCESS, either got all the values or the depth changed. */
 	else{
-		if(vals_read){
-			_val_len = vals_read;
-			_val_idx = 0;
-			_parser_state = ST_DATUM;
-		}
-		else if(_depth < _pstate.depth){
+		/* Return 0 elements if pullparser depth lags parser depth.
+		 * Indicate type of structure. */
+		if(_depth < _pstate.depth){
 			++_depth;
 			_parser_state = (_pstate.stack[_depth] & BNJ_OBJECT) ? ST_MAP : ST_LIST;
+			return _parser_state;
 		}
 		else if(_depth > _pstate.depth){
 			unsigned st = _pstate.stack[_depth];
 			--_depth;
 			_parser_state = (st & BNJ_OBJECT) ? ST_ASCEND_MAP : ST_ASCEND_LIST;
+			return _parser_state;
 		}
 
-		/* Advance to where parser left off. */
-		_first_unparsed = res - _buffer;
-		return _parser_state;
+		/* Beginning new context, pay attention to new user keys. */
+		_ctx.key_set = key_set;
+		_ctx.key_set_length = key_set_length;
 	}
 
-	/* Must have consumed all bytes read. */
-	//assert(res == _buffer + _first_empty);
+	/* Assume offset starts at first unparsed. */
+	_offset = _first_unparsed;
 
-	/* If EOF occurred before filling buffer, give up. */
-	if(_first_empty < end_bound)
-		throw std::runtime_error("PullParser::Pull Unexpected EOF");
-
-	/* Buffer full when _offset == 0. Buffer parsed but not sent to user.*/
-	if(0 == _offset){
-		/* FIXME */
-		throw std::runtime_error("Internal error 2!");
+	/* Fill all empty bytes. At most will do this twice per Pull() call. */
+	if(READ_ST == _state){
+reread:
+		FillBuffer(end_bound);
+		_state = PARSE_ST;
 	}
 
-	/* Limit next read phase to the first COMPLETED key or string. */
-	for(unsigned i = 0; i < vals_read; ++i){
-		if(_pstate.v[i].key_length){
-			end_bound = _first_unparsed + _pstate.v[i].key_offset;
-			break;
+	/* Assign output values. */
+	_pstate.v = _valbuff;
+	_pstate.vlen = 4;
+	_val_idx = 0;
+	_val_len = 0;
+
+	/* Parse data. Adjust value read count. */
+	const uint8_t* res = bnj_parse(&_pstate, _buffer + _first_unparsed,
+		_first_empty - _first_unparsed);
+
+	/* Abort on error. */
+	if(_pstate.flags & BNJ_ERROR_MASK)
+		throw input_error(s_error_msgs[_pstate.flags - BNJ_ERROR_MASK], 0);
+
+	/* When one key:value is only partially read, may need to call the
+	 * reader and parser again to completely interpret the value. Really want
+	 * to return a complete value to the user if possible.
+	 * -Do not bother to do go through with this if the value is a string, since
+	 *  Consume*() handle this situation already.
+	 * -Non-string values and their keys do not are smaller than _len. */
+	if(1 == _pstate.vi && bnj_incomplete(&_pstate, _pstate.v)){
+		if(bnj_val_type(_pstate.v) != BNJ_STRING){
+
+			/* Check if ran out of data before finished parsing! */
+			if(_first_empty != end_bound)
+				throw std::runtime_error("Abrupt end of data!");
+
+			/* Bias key offset && shift incomplete pieces to front of buffer. */
+			_pstate.v->key_offset += _first_unparsed;
+			uint8_t* start = bnj_fragshift(_pstate.v, _buffer, &end_bound);
+			_first_empty = start - _buffer;
+			end_bound -= _first_empty;
+			goto reread;
 		}
-		else if(BNJ_STRING <= (_pstate.v[i].type & BNJ_TYPE_MASK)){
-			end_bound = _first_unparsed + _pstate.v[i].strval_offset;
-			break;
-		}
 	}
 
-	/* Shift COMPLETED key/string offsets to coincide with buffer start. */
-	for(unsigned i = 0; i < vals_read; ++i){
-		if(_pstate.v[i].key_length)
-			_pstate.v[i].key_offset += _first_unparsed;
-		_pstate.v[i].strval_offset += _first_unparsed;
+	if(_pstate.vi){
+		_val_len = _pstate.vi;
+		_val_idx = 0;
+		_parser_state = ST_DATUM;
+	}
+	else if(_depth < _pstate.depth){
+		++_depth;
+		_parser_state = (_pstate.stack[_depth] & BNJ_OBJECT) ? ST_MAP : ST_LIST;
+	}
+	else if(_depth > _pstate.depth){
+		unsigned st = _pstate.stack[_depth];
+		--_depth;
+		_parser_state = (st & BNJ_OBJECT) ? ST_ASCEND_MAP : ST_ASCEND_LIST;
 	}
 
-	/*  */
-	_state = READ_ST;
-	_offset = 0;
-
-	/* Resume from first incomplete value. */
-	_pstate.v += vals_read;
-	_pstate.vlen -= vals_read;
-
-	goto reread;
+	/* Advance to where parser left off. */
+	_first_unparsed = res - _buffer;
+	return _parser_state;
 }
 
 void BNJ::PullParser::Up(void){
-	//fprintf(stderr, " >>> Pull: Up %d %d\n", _depth, _pstate.depth);
 	const unsigned dest_depth = _depth - 1;
 
 	unsigned st = _pstate.stack[_depth];
 
 	/* Loop until parser depth goes above destination depth. Drop the data. */
-	while(dest_depth <= _pstate.depth){
-		//fprintf(stderr, " >>> Going: Up %d %d %d\n", dest_depth, _depth, _pstate.depth);
+	while(dest_depth <= _pstate.depth)
 		Pull();
-	}
 
 	/* If at greater depth than parser then just decrement depth. */
 	_depth = dest_depth;
@@ -298,40 +324,28 @@ void BNJ::PullParser::Up(void){
 		_parser_state = ST_NO_DATA;
 	else
 		_parser_state = (st & BNJ_OBJECT) ? ST_ASCEND_MAP : ST_ASCEND_LIST;
-
-	//fprintf(stderr, " >>> Pull Final: Up %d %d\n", _depth, _pstate.depth);
 }
 
-static const char* s_type_strings[] = {
-	"numeric",
-	"special",
-	"array",
-	"map",
-	"UTF-8",
-	"UTF-16",
-	"UTF-32"
-};
+/* Updates the following fields:
+ * -_first_empty
+ * -_first_unparsed
+ * -_buffer
+ * */
+void BNJ::PullParser::FillBuffer(unsigned end_bound){
+	_first_empty %= _len;
+	_first_unparsed = _first_empty;
+	while(_first_empty < end_bound){
+		int bytes_read =
+			_reader->Read(_buffer + _first_empty, end_bound - _first_empty);
 
-static void s_throw_key_error(const BNJ::PullParser& p, unsigned key_enum){
-	const bnj_val& val = p.GetValue();
-	char buffer[1024];
-	char* x;
-	x = stpcpy(buffer, "Key mismatch: expected ");
-	x = stpcpy(x, p.c_state().user_ctx->key_set[key_enum]);
-	x = stpcpy(x, ", found ");
-	x = bnj_stpncpy(x, &val, 1024 - (x - buffer), p.Buff(), 'K');
-	throw BNJ::PullParser::input_error(buffer, p.FileOffset(val));
-}
+		/* FIXME Handle signal interruption. */
+		if(bytes_read < 0)
+			throw std::runtime_error("PullParser::Pull Read error.");
 
-static void s_throw_type_error(const BNJ::PullParser& p, unsigned type){
-	const bnj_val& val = p.GetValue();
-	char buffer[1024];
-	char* x;
-	x = stpcpy(buffer, "Type mismatch: expected ");
-	x = stpcpy(x, s_type_strings[type]);
-	x = stpcpy(x, ", got ");
-	x = stpcpy(x, s_type_strings[val.type & BNJ_TYPE_MASK]);
-	throw BNJ::PullParser::input_error(buffer, p.FileOffset(val));
+		if(0 == bytes_read)
+			break;
+		_first_empty += bytes_read;
+	}
 }
 
 unsigned BNJ::GetKey(char* dest, unsigned destlen, const PullParser& p){
@@ -339,23 +353,7 @@ unsigned BNJ::GetKey(char* dest, unsigned destlen, const PullParser& p){
 	if(dest){
 		if(val.key_length > destlen)
 			throw std::runtime_error("First key value overlong!");
-		return bnj_stpcpy(dest, &val, p.Buff(), 'K') - dest;
-	}
-	return 0;
-}
-
-unsigned BNJ::Consume(char* dest, unsigned destlen, const PullParser& p,
-	unsigned key_enum)
-{
-	const bnj_val& val = p.GetValue();
-	if(key_enum != 0xFFFFFFFF && val.key_enum != key_enum)
-		s_throw_key_error(p, key_enum);
-	if((val.type & BNJ_TYPE_MASK) != BNJ_UTF_8)
-		s_throw_type_error(p, BNJ_UTF_8);
-	if(dest){
-		if(val.strval_length > destlen)
-			throw std::runtime_error("First key value overlong!");
-		return bnj_stpcpy(dest, &val, p.Buff(), 0) - dest;
+		return bnj_stpkeycpy(dest, &val, p.Buff()) - dest;
 	}
 	return 0;
 }
@@ -364,7 +362,7 @@ void BNJ::Get(unsigned& u, const PullParser& p, unsigned key_enum){
 	const bnj_val& val = p.GetValue();
 	if(key_enum != 0xFFFFFFFF && val.key_enum != key_enum)
 		s_throw_key_error(p, key_enum);
-	if((val.type & BNJ_TYPE_MASK) != BNJ_NUMERIC)
+	if(bnj_val_type(&val) != BNJ_NUMERIC)
 		s_throw_type_error(p, BNJ_NUMERIC);
 
 	if(val.exp_val)
@@ -381,7 +379,7 @@ void BNJ::Get(int& ret, const PullParser& p, unsigned key_enum){
 	const bnj_val& val = p.GetValue();
 	if(key_enum != 0xFFFFFFFF && val.key_enum != key_enum)
 		s_throw_key_error(p, key_enum);
-	if((val.type & BNJ_TYPE_MASK) != BNJ_NUMERIC)
+	if(bnj_val_type(&val) != BNJ_NUMERIC)
 		s_throw_type_error(p, BNJ_NUMERIC);
 
 	if(val.exp_val)
@@ -401,7 +399,7 @@ void BNJ::Get(float& f, const PullParser& p, unsigned key_enum){
 	if(key_enum != 0xFFFFFFFF && val.key_enum != key_enum)
 		s_throw_key_error(p, key_enum);
 
-	unsigned t = val.type & BNJ_TYPE_MASK;
+	unsigned t = bnj_val_type(&val);
 	if(BNJ_NUMERIC == t){
 		f = bnj_float(&val);
 	}
@@ -420,7 +418,7 @@ void BNJ::Get(double& d, const PullParser& p, unsigned key_enum){
 	if(key_enum != 0xFFFFFFFF && val.key_enum != key_enum)
 		s_throw_key_error(p, key_enum);
 
-	unsigned t = val.type & BNJ_TYPE_MASK;
+	unsigned t = bnj_val_type(&val);
 	if(BNJ_NUMERIC == t){
 		d = bnj_double(&val);
 	}
@@ -439,7 +437,7 @@ void BNJ::VerifyNull(const PullParser& p, unsigned key_enum){
 	const bnj_val& val = p.GetValue();
 	if(key_enum != 0xFFFFFFFF && val.key_enum != key_enum)
 		s_throw_key_error(p, key_enum);
-	if((val.type & BNJ_TYPE_MASK) != BNJ_SPC_NULL
+	if(bnj_val_type(&val) != BNJ_SPC_NULL
 		&& val.significand_val != BNJ_SPC_NULL)
 	{
 		s_throw_type_error(p, BNJ_SPECIAL);

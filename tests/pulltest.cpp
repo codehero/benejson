@@ -5,7 +5,7 @@
 #include <benejson/pull.hh>
 #include "posix.hh"
 
-void OutputValue(const BNJ::PullParser& parser){
+void OutputValue(BNJ::PullParser& parser){
 	const bnj_val& val = parser.GetValue();
 
 	if(val.key_length){
@@ -68,10 +68,20 @@ void OutputValue(const BNJ::PullParser& parser){
 
 		case BNJ_STRING:
 			{
+				/* Can read the length of the string fragment before consuming
+				unsigned outlen = bnj_strlen8(&parser.GetValue());
+				unsigned outlen = bnj_strlen16(&parser.GetValue());
+				unsigned outlen = bnj_strlen32&parser.GetValue());
+				*/
+
+				unsigned len;
 				char buffer[1024];
-				unsigned outlen = parser.GetValue().strval_length;
-				unsigned len = BNJ::Consume(buffer, 1024, parser);
-				fprintf(stdout, "string: '%s'\n", buffer);
+
+				/* Consume/Write loop */
+				fprintf(stdout, "string: '");
+				while((len = parser.Consume8(buffer, 1024)))
+					fwrite(buffer, 1, len, stdout);
+				fprintf(stdout, "'\n");
 			}
 			break;
 

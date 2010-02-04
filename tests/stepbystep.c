@@ -31,7 +31,6 @@ int main(int argc, const char* argv[]){
 	while(go){
 		uint8_t buff[2048];
 		int ret = read(0, buff, 2048);
-		int x;
 
 		/* Read EOF before parsing a json. */
 		if(ret == 0)
@@ -51,8 +50,8 @@ int main(int argc, const char* argv[]){
 				"\"se\":%6u, \"st\":\"0x%02x\", \"kl\":%3u,"
 				"\"dv\":\"0x%08x\",\"c\":%u},\n",
 				*cur, mstate.depth_change, mstate.vi, mstate.depth, mstate.digit_count,
-				mstate.flags, mstate._decimal_offset, mstate._save.significand_val,
-				mstate._save.exp_val, mstate._save.type, mstate._key_len,
+				mstate.flags, mstate._decimal_offset, mstate._paf_significand_val,
+				mstate._paf_exp_val, mstate._paf_type, mstate._key_len,
 				mstate.stack[mstate.depth], res - cur);
 			++line_count;
 

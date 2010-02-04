@@ -35,7 +35,7 @@ int usercb(const bnj_state* state, const uint8_t* buff){
 		for(i = 0; i < state->vi; ++i){
 
 			if(st & BNJ_OBJECT){
-				bnj_stpcpy(buffer, state->v + i, buff, 'K');
+				bnj_stpkeycpy(buffer, state->v + i, buff);
 				printf("  Key %s;", buffer);
 
 				if(state->user_ctx->key_set){
@@ -46,14 +46,9 @@ int usercb(const bnj_state* state, const uint8_t* buff){
 			printf("Type:%x;", state->v[i].type);
 			if(!(state->v[i].type & BNJ_VFLAG_KEY_FRAGMENT)){
 				switch(state->v[i].type & BNJ_TYPE_MASK){
-					case BNJ_UTF_8:
-						bnj_stpcpy(buffer, state->v + i, buff, 0);
+					case BNJ_STRING:
+						bnj_stpcpy8(buffer, state->v + i, buff);
 						printf("Val %s;", buffer);
-						break;
-
-					case BNJ_UTF_16:
-					case BNJ_UTF_32:
-						printf("Unsupported string type;");
 						break;
 
 					case BNJ_NUMERIC:

@@ -100,6 +100,24 @@ namespace BNJ {
 			/** @brief Size of whole buffer. */
 			unsigned BuffLen(void) const;
 
+
+			/** @brief Consume UTF-8 multibyte charactesr into user buffer.
+			 *  -Note this can advance internal parsing c_state.
+			 *  -Return value is 0 when no more chars to read
+			 *  -Only "whole" UTF-8 characters read.
+			 *  @param dest Where to store key string. If NULL, then just verifies.
+			 *  @param destlen Maximum size of destination. Must be >= 4.
+			 *  @param key_enum Verify key idx matches enum val. Default no matching.
+			 *  If omitted no key verification performed.
+			 *  @return Number of bytes copied, excluding null terminator.
+			 *  If 0, then no more chars in the value. Next call should be Pull()
+			 *  @throw  type mismatch, key_enum mismatch
+			 *  or destlen < 4 bytes in size. */
+			unsigned Consume8(char* dest, unsigned destlen,
+				unsigned key_enum = 0xFFFFFFFF);
+
+			/* TODO Wide character version of Consume(). */
+
 			/** @brief Get currently parsed value.
 			 *  @throw If parser does not currently hold a valid value. */
 			const bnj_val& GetValue(void) const;
@@ -146,6 +164,11 @@ namespace BNJ {
 			/** @brief Copy ctor. */
 			PullParser(const PullParser& p);
 
+			/** @brief Fill up _buffer from beginning.
+			 *  @param end_bound Offset to end of fill region.
+			 *  @throw On input error. */
+			void FillBuffer(unsigned end_bound);
+
 			/** @brief Internal value buffer. */
 			bnj_val _valbuff[4];
 
@@ -185,6 +208,9 @@ namespace BNJ {
 			/** @brief How many bytes have been pull parsed. */
 			unsigned _pull_parsed;
 
+			/** @brief How many UTF-8 bytes remaining. */
+			unsigned _utf8_remaining;
+
 			/** @brief Holds current user keyset. */
 			bnj_ctx _ctx;
 
@@ -207,18 +233,6 @@ namespace BNJ {
 	 *  @return Number of bytes copied, excluding null terminator.
 	 *  @throw destlen < key length or not in a MAP context. */
 	unsigned GetKey(char* dest, unsigned destlen, const PullParser& p);
-
-	/** @brief Consume string value into user buffer.
-	 *  Note this can change internal parsing state.
-	 *  @param dest Where to store key string. If NULL, then just verifies.
-	 *  @param destlen Maximum size of destination.
-	 *  @param p Parser instance.
-	 *  @param key_enum Verify key idx matches enum value. Default no matching.
-	 *  If omitted no key verification performed.
-	 *  @return Number of bytes copied, excluding null terminator.
-	 *  @throw destlen <= string length or type mismatch or key_enum mismatch. */
-	unsigned Consume(char* dest, unsigned destlen, const PullParser& p,
-		unsigned key_enum = 0xFFFFFFFF);
 
 	void Get(unsigned& dest, const PullParser& p, unsigned key_enum = 0xFFFFFFFF);
 

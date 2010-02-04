@@ -49,7 +49,7 @@ int usercb(const bnj_state* state, const uint8_t* buff){
 			}
 
 			switch(state->v[i].type & BNJ_TYPE_MASK){
-				case BNJ_UTF_8:
+				case BNJ_STRING:
 					{
 						unsigned limit = state->v[i].strval_offset;
 						while(curout < limit - 1){
@@ -67,10 +67,6 @@ int usercb(const bnj_state* state, const uint8_t* buff){
 						printf("s");
 						++curout;
 					}
-					break;
-
-				case BNJ_UTF_16:
-				case BNJ_UTF_32:
 					break;
 
 				case BNJ_NUMERIC:
