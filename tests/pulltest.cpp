@@ -14,7 +14,7 @@ void OutputValue(BNJ::PullParser& parser){
 		fprintf(stdout, "key: '%s'\n", key);
 	}
 
-	switch(val.type & BNJ_TYPE_MASK){
+	switch(bnj_val_type(&val)){
 		case BNJ_NUMERIC:
 			if(val.exp_val){
 				double f;
@@ -155,9 +155,6 @@ int main(int argc, const char* argv[]){
 	}
 	delete [] buffer;
 	delete [] pstack;
-
-	/* Impossible to have memory leaks. */
-	fprintf(stdout, "memory leaks:\t0\n");
 
 	return ret;
 }

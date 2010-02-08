@@ -6,15 +6,6 @@
 
 #include <benejson/benejson.h>
 
-/* The most important variables
- *
- * -depth_change
- * -vi
- * -depth
- * -stack[depth - depth_change]
- *
- * */
-
 static unsigned s_last_keylen;
 static unsigned s_last_strlen;
 

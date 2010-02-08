@@ -35,14 +35,14 @@ static const uint8_t s_lookup[256] = {
 	CINV|CWHI, CINV|CWHI, CINV|CWHI, CINV|CWHI, CINV|CWHI, CINV, CINV, CINV,
 	CINV, CINV, CINV, CINV, CINV, CINV, CINV, CINV,
 	CINV|CWHI, CINV, CINV, CINV, CINV, CINV, CINV, CINV,
-	CWHI, 0, CESC|CINV, 0, 0, 0, 0, 0,
+	CWHI, 0, CESC, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, CESC,
 	CHEX, CHEX, CHEX, CHEX, CHEX, CHEX, CHEX, CHEX,
 	CHEX, CHEX, 0, 0, 0, 0, 0, 0,
 	0, CHEX, CHEX, CHEX, CHEX, CHEX, CHEX, 0,
 	0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, CBEG, CESC|CINV, CEND, 0, 0,
+	0, 0, 0, CBEG, CESC, CEND, 0, 0,
 	0, CHEX, CESC|CHEX, CHEX, CHEX, CHEX, CESC|CHEX, 0,
 	0, 0, 0, 0, 0, 0, CESC, 0,
 	0, 0, CESC, 0, CESC, 0, 0, 0,
@@ -84,6 +84,10 @@ enum {
 	BNJ_STR_U1,
 	BNJ_STR_U2,
 	BNJ_STR_U3,
+	BNJ_STR_SURROGATE,
+	BNJ_STR_SURROGATE_1,
+	BNJ_STR_SURROGATE_2,
+	BNJ_STR_SURROGATE_3,
 
 	BNJ_STR_UTF3,
 	BNJ_STR_UTF2,
@@ -109,7 +113,7 @@ static const char* s_reserved_arr[BNJ_COUNT_SPC] = {
 };
 
 static uint8_t s_hex(uint8_t c){
-	return (c <= '9') ? c - '0' : (c & 0xDF) -'A';
+	return (c <= '9') ? c - '0' : (c & 0xDF) -'7';
 }
 
 static inline uint8_t* s_write_utf8(uint8_t* dst, const uint8_t* end,
@@ -117,12 +121,14 @@ static inline uint8_t* s_write_utf8(uint8_t* dst, const uint8_t* end,
 {
 	/* Write UTF-8 encoded value. Advance dst to point to last byte. */
 	/* If not enough space remaining do nothing. */
-	if(v < 0x800 && end - dst >= 4){
-		dst[3] = 0x80 | (v & 0x3F); v >>= 6;
-		dst[2] = 0x80 | (v & 0x3F); v >>= 6;
+	if(v < 0x80 && end - dst >= 1){
+		dst[0] = v;
+		++dst;
+	}
+	else if(v < 0x800 && end - dst >= 2){
 		dst[1] = 0x80 | (v & 0x3F); v >>= 6;
-		dst[0] = 0xF0 | v;
-		dst += 4;
+		dst[0] = 0xC0 | v;
+		dst += 2;
 	}
 	else if(v < 0x10000 && end - dst >= 3){
 		dst[2] = 0x80 | (v & 0x3F); v >>= 6;
@@ -130,10 +136,12 @@ static inline uint8_t* s_write_utf8(uint8_t* dst, const uint8_t* end,
 		dst[0] = 0xE0 | v;
 		dst += 3;
 	}
-	else if(end - dst >= 2){
+	else if(end - dst >= 4){
+		dst[3] = 0x80 | (v & 0x3F); v >>= 6;
+		dst[2] = 0x80 | (v & 0x3F); v >>= 6;
 		dst[1] = 0x80 | (v & 0x3F); v >>= 6;
-		dst[0] = 0xC0 | v;
-		dst += 2;
+		dst[0] = 0xF0 | v;
+		dst += 4;
 	}
 	return dst;
 }
@@ -207,6 +215,7 @@ bnj_state* bnj_state_init(bnj_state* ret, uint32_t* stack, uint32_t stack_length
 
 	/* Initialize first state. */
 	ret->flags = BNJ_VALUE_START;
+	ret->_cp_fragment = BNJ_EMPTY_CP;
 
 	return ret;
 }
@@ -215,19 +224,37 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 	const uint8_t* i = buffer;
 	const uint8_t * const end = buffer + len;
 
+	/* The purpose of first_cp_frag is to track the placement of string fragments
+	 * with respect to the buffer. The buffer can have two possible fragments:
+	 * -one at the front
+	 * -one at the back
+	 * If there is no fragment at the front, _cp_fragment will be EMPTY.
+	 * Then there is no fragment to remember at the beginning, and
+	 * curval (state->v really) if it is a string, will not have to remember a 
+	 * fragment in significand_val.
+	 *
+	 * If _cp_fragment is not EMPTY, then when parsing of the string is complete
+	 * that curval (state->v) will have the fragment stored at its beginning.
+	 * first_cp_frag will then be cleared. The _cp_fragment will contain the
+	 * end fragment.*/
+	uint32_t first_cp_frag = state->_cp_fragment;
+
 	bnj_val* curval = state->v;
 	s_reset_state(state);
 
 	/* PAF restore. Only restore exp_val if NOT a string type. */
 	curval->key_enum = state->_paf_key_enum;
 	curval->type = state->_paf_type;
-	curval->exp_val = ((curval->type & BNJ_TYPE_MASK) != BNJ_STRING)
+	curval->exp_val = (bnj_val_type(curval) != BNJ_STRING)
 		? state->_paf_exp_val : 0;
+	curval->cp1_count = 0;
+	curval->cp2_count = 0;
+	curval->cp3_count = 0;
 
 	/* Copy significand value directly if code point fragment value is not
 	 * set to valid char. Otherwise copy fragmented char into it. */
-	curval->significand_val = (state->_cp_fragment != BNJ_EMPTY_CP) ? 
-		state->_paf_significand_val : state->_cp_fragment;
+	curval->significand_val = (bnj_val_type(curval) != BNJ_STRING) ?
+		state->_paf_significand_val : BNJ_EMPTY_CP;
 
 	/* Offsets are always zeroed. */
 	curval->key_offset = 0;
@@ -636,31 +663,28 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 					}
 					else if(*i & 0x80){
 						/* Process first byte. */
+						state->_cp_fragment = *i;
 						if((*i & 0xF8) == 0xF0){
-							/* Check upper bound on Unicode code points.*/
-							if(*i - 0xF0 > 0x4){
-								SETSTATE(state->flags, BNJ_ERR_UTF_8);
-								return i;
-							}
+							/* CINV flag set on invalid 0xF5...*/
 
-							/* 4 byte code point. */
-							state->_cp_fragment = *i & 0x07;
+							/* 4 byte code point. Will shift by 18 bits, store 21 high bits. */
+							state->_cp_fragment &= 0x07;
+							state->_cp_fragment |= 0xFFFFF800;
 							SETSTATE(state->flags, BNJ_STR_UTF3);
 						}
 						else if((*i & 0xF0) == 0xE0){
-							/* 3 byte code point. */
-							state->_cp_fragment = *i & 0x0F;
+							/* 3 byte code point. Will shift by 12 bits, store 14 high bits. */
+							state->_cp_fragment &= 0x0F;
+							state->_cp_fragment |= 0xFFFC0000;
 							SETSTATE(state->flags, BNJ_STR_UTF2);
 						}
 						else if((*i & 0xE0) == 0xC0){
-							/* Check for overlong encoding */
-							if(*i - 0xC0 < 2){
-								SETSTATE(state->flags, BNJ_ERR_UTF_8);
-								return i;
-							}
+							/* NOTE: 0xC0-0xC1 are already marked invalid in table,
+							 * so don't bother testing here. */
 
-							/* 2 byte code point. */
-							state->_cp_fragment = *i & 0x1F;
+							/* 2 byte code point. Will shift by 6 bits, store 7 high bits. */
+							state->_cp_fragment &= 0x1F;
+							state->_cp_fragment |= 0xFE000000;
 							SETSTATE(state->flags, BNJ_STR_UTF1);
 						}
 						else{
@@ -674,6 +698,7 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 						++i;
 						if(i == end)
 							return i;
+						break;
 
 						/* Process third to last byte. */
 			case BNJ_STR_UTF3:
@@ -693,8 +718,6 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 							SETSTATE(state->flags, BNJ_STR_UTF2);
 							return i;
 						}
-						else if(curval->significand_val != BNJ_EMPTY_CP)
-							++curval->strval_offset;
 
 						/* Process penultimate byte. */
 			case BNJ_STR_UTF2:
@@ -709,8 +732,6 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 							SETSTATE(state->flags, BNJ_STR_UTF1);
 							return i;
 						}
-						else if(curval->significand_val != BNJ_EMPTY_CP)
-							++curval->strval_offset;
 
 						/* Process last byte. */
 			case BNJ_STR_UTF1:
@@ -720,8 +741,34 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 						}
 						state->_cp_fragment <<= 6;
 						state->_cp_fragment |= *i & 0x3F;
-						if(curval->significand_val != BNJ_EMPTY_CP)
-							++curval->strval_offset;
+
+						/* Check for overlong encodings. */
+						switch(state->_cp_fragment >> 29){
+							/* 4 byte encoding. */
+							case 0x7:
+								if((state->_cp_fragment & 0xFFFFFF) < 0x10000){
+									SETSTATE(state->flags, BNJ_ERR_UTF_8);
+									return i;
+								}
+								break;
+
+							/* 3 byte encoding. */
+							case 0x6:
+								if((state->_cp_fragment & 0xFFFFFF) < 0x800){
+									SETSTATE(state->flags, BNJ_ERR_UTF_8);
+									return i;
+								}
+								break;
+
+							/* 2 byte encoding. Nothing to do. */
+							case 0x4:
+								break;
+
+								/* No other values should appear. */
+							default:
+								assert(0);
+						}
+						state->_cp_fragment &= 0xFFFFFF;
 
 						if(state->_cp_fragment >= 0xD800 && state->_cp_fragment <= 0xDFFF){
 							/* MAYBE, should I really reject this? a wstrcpy function
@@ -740,13 +787,15 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 
 						/* If at the beginning of parse _cp_fragment was not BNJ_EMPTY_CP,
 						 * copy the completed _cp_fragment to significand_val. */
-						if(curval->significand_val != BNJ_EMPTY_CP)
+						if(first_cp_frag != BNJ_EMPTY_CP){
+							curval->strval_offset = i - buffer + 1;
 							curval->significand_val = state->_cp_fragment;
+							first_cp_frag = 0;
+						}
 
 						/* Reset the fragment value. */
 						state->_cp_fragment = BNJ_EMPTY_CP;
-
-						++i;
+						SETSTATE(state->flags, BNJ_STRING_ST);
 					}
 					else if(*i == '"'){
 						/* If value ends, then move to end value state; otherwise
@@ -764,35 +813,136 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 						}
 					}
 					else if(*i == '\\'){
+						/* Escape sequence, initialize fragment to 0. */
+						state->_cp_fragment = 0;
 						++i;
 						if(i == end){
 							SETSTATE(state->flags, BNJ_STR_ESC);
 							break;
 						}
 
+
 			case BNJ_STR_ESC:
 						if('u' == *i){
+
+							/* Starting new UTF-16 code point, so reset cp frag.
+							 * However, if processed a first surrogate half, ensure
+							 * that we begin a second half. */
+							if(1){
+								SETSTATE(state->flags, BNJ_STR_U0);
+							}
+							else{
+			case BNJ_STR_SURROGATE:
+								if(*i != '\\'){
+									SETSTATE(state->flags, BNJ_ERR_UTF_SURROGATE);
+									return i;
+								}
+								++i;
+								if(i == end){
+									SETSTATE(state->flags, BNJ_STR_SURROGATE_1);
+									return i;
+								}
+
+			case BNJ_STR_SURROGATE_1:
+								if(*i != 'u'){
+									SETSTATE(state->flags, BNJ_ERR_UTF_SURROGATE);
+									return i;
+								}
+								++i;
+								if(i == end){
+									SETSTATE(state->flags, BNJ_STR_SURROGATE_2);
+									return i;
+								}
+
+			case BNJ_STR_SURROGATE_2:
+								if(s_hex(*i) != 0xD){
+									SETSTATE(state->flags, BNJ_ERR_UTF_SURROGATE);
+									return i;
+								}
+								++i;
+								if(i == end){
+									SETSTATE(state->flags, BNJ_STR_SURROGATE_3);
+									return i;
+								}
+
+			case BNJ_STR_SURROGATE_3:
+								if(s_hex(*i) < 0xC){
+									SETSTATE(state->flags, BNJ_ERR_UTF_SURROGATE);
+									return i;
+								}
+
+								/* Keep lower two bits from this value. */
+								state->_cp_fragment <<= 2;
+								state->_cp_fragment |= s_hex(*i) & 0x3;
+
+								/* Add in 0x10000 (0x100 here since still reading last byte.) */
+								state->_cp_fragment += 0x100;
+								SETSTATE(state->flags, BNJ_STR_U2);
+							}
 							++i;
-							SETSTATE(state->flags, BNJ_STR_U0);
 
 			case BNJ_STR_U0:
 			case BNJ_STR_U1:
 			case BNJ_STR_U2:
 			case BNJ_STR_U3:
-							/* FIXME!!! */
 							while(i != end){
 								if(!(s_lookup[*i] & CHEX)){
 									state->flags = BNJ_ERR_INV_HEXESC;
 									return i;
 								}
+
+								state->_cp_fragment <<= 4;
+								state->_cp_fragment |= s_hex(*i);
 								++i;
-								if(BNJ_STR_U3 == state->flags){
-									SETSTATE(state->flags, BNJ_STRING_ST);
-									/* Increase raw and character count. */
-									break;
+
+								if(BNJ_STR_U3 != state->flags){
+									++state->flags;
+									continue;
 								}
 
-								++state->flags;
+								/* If not beginning of surrogate pair, then complete char. */
+								if(state->_cp_fragment < 0xD800
+									|| state->_cp_fragment >= 0xDC00)
+								{
+									/* Ensure this is not second half of surrogate. */
+									if(state->_cp_fragment < 0xD800
+										|| state->_cp_fragment >= 0xE000)
+									{
+										/* Increment appropriate cp count. */
+										if(state->_cp_fragment < 0x80)
+											++curval->cp1_count;
+										else if(state->_cp_fragment < 0x800)
+											++curval->cp2_count;
+										else if(state->_cp_fragment < 0x10000)
+											++curval->cp3_count;
+										else
+											++curval->exp_val;
+
+										/* If at beginning of parse _cp_fragment was not BNJ_EMPTY_CP,
+										 * copy the completed _cp_fragment to significand_val. */
+										if(first_cp_frag != BNJ_EMPTY_CP){
+											curval->strval_offset = i - buffer + 1;
+											curval->significand_val = state->_cp_fragment;
+											first_cp_frag = 0;
+										}
+
+										/* Reset the fragment value. */
+										state->_cp_fragment = BNJ_EMPTY_CP;
+
+										SETSTATE(state->flags, BNJ_STRING_ST);
+									}
+									else{
+										/* Invalid placement of second surrogate half. */
+										SETSTATE(state->flags, BNJ_ERR_UTF_SURROGATE);
+										return --i;
+									}
+								}
+								else{
+									/* Keep only 10 bits. */
+									state->_cp_fragment &= 0x3FF;
+									SETSTATE(state->flags, BNJ_STR_SURROGATE);
+								}
+								break;
 							}
 							break;
 						}
@@ -802,7 +952,45 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 								return i;
 							}
 
-							/* Increase both cp1 and character count. */
+							/* If at beginning of parse _cp_fragment was not BNJ_EMPTY_CP,
+							 * copy the completed _cp_fragment to significand_val. */
+							if(first_cp_frag != BNJ_EMPTY_CP){
+								switch(*i){
+									case '"':
+										curval->significand_val = '"';
+										break;
+									case '\\':
+										curval->significand_val = '\\';
+										break;
+									case '/':
+										curval->significand_val = '/';
+										break;
+									case 'b':
+										curval->significand_val = '\b';
+										break;
+									case 'f':
+										curval->significand_val = '\f';
+										break;
+									case 'n':
+										curval->significand_val = '\n';
+										break;
+									case 'r':
+										curval->significand_val = '\r';
+										break;
+									case 't':
+										curval->significand_val = '\t';
+										break;
+									default:
+										assert(0);
+								}
+								curval->strval_offset = i - buffer + 1;
+								first_cp_frag = 0;
+							}
+
+							/* Reset the fragment value. */
+							state->_cp_fragment = BNJ_EMPTY_CP;
+
+							/* Increase cp1 count. */
 							++(curval->cp1_count);
 							SETSTATE(state->flags, BNJ_STRING_ST);
 						}
@@ -1043,6 +1231,7 @@ uint8_t* bnj_json2utf8(uint8_t* dst, size_t destlen, const uint8_t** buff){
 				case 'u':
 					{
 						const uint8_t* rollback = x - 1;
+						++x;
 						unsigned v = s_hex(*x);
 						v <<= 4; ++x;
 						v |= s_hex(*x);
@@ -1056,7 +1245,7 @@ uint8_t* bnj_json2utf8(uint8_t* dst, size_t destlen, const uint8_t** buff){
 							/* Skip over already read '\', 'u', and first hex */
 							x += 3;
 
-							/* Remove surrogate bits. */
+							/* Keep only lower 10 bits. */
 							v &= 0x3FF;
 
 							/* Apply highest 2 bits. */
@@ -1103,27 +1292,26 @@ inline uint8_t* bnj_stpncpy8(uint8_t* dst, const bnj_val* src, size_t len,
 	const uint8_t* buff)
 {
 	size_t clen = bnj_strlen8(src);
-	if(clen){
-		const uint8_t* b = buff + src->strval_offset;
+	if(clen && len){
+		/* Save space for null terminator. */
+		--len;
 
 		/* Copy fragmented char if applicable. */
 		if(src->significand_val != BNJ_EMPTY_CP){
 			uint8_t* res = s_write_utf8(dst, dst + len, (uint32_t)src->significand_val);
 			if(dst != res){
-				len -= dst - res;
-				/* If no room left for a NULL terminator just return. */
-				if(0 == len)
-					return dst;
-
-				clen -= dst - res;
+				len -= res - dst;
+				clen -= res - dst;
 				dst = res;
 			}
 			else
 				return dst;
 		}
 
+
 		/* Only copy up to minimum of len and content length. */
-		uint8_t* res = bnj_json2utf8(dst, (clen < len - 1) ? clen : len - 1, &b);
+		const uint8_t* b = buff + src->strval_offset;
+		uint8_t* res = bnj_json2utf8(dst, (clen < len) ? clen : len, &b);
 		*res = '\0';
 		return res;
 	}

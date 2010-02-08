@@ -6,6 +6,7 @@ Import('*')
 step = bin_env.Program("step", Split('stepbystep.c'), LIBS=Split("benejson m"));
 json = bin_env.Program("jsontest", Split('jsontest.c'), LIBS=Split("benejson m"));
 jbuff = bin_env.Program("jbuff", Split('jsonbuff.c'), LIBS=Split("benejson m"));
+strtest = bin_env.Program("strtest", Split('strtest.c'), LIBS=Split("benejson m"));
 
 pulltest = bin_env.Program("pulltest", Split('pulltest.cpp posix.cpp'), LIBS=Split("benejson m"));
 
@@ -13,3 +14,4 @@ bin_env.Install(bin_env.BinDest, step)
 bin_env.Install(bin_env.BinDest, json)
 bin_env.Install(bin_env.BinDest, jbuff)
 bin_env.Install(bin_env.BinDest, pulltest)
+bin_env.Install(bin_env.BinDest, strtest)

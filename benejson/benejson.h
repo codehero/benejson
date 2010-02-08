@@ -136,7 +136,7 @@ enum {
 	BNJ_ERROR_MASK = 0x40000000,
 
 	/** @brief Extra comma detected. */
-	BNJ_ERR_EXTRA_COMMA,
+	BNJ_ERR_EXTRA_COMMA = BNJ_ERROR_MASK,
 
 	/** @brief Expected comma. */
 	BNJ_ERR_NO_COMMA,
@@ -183,8 +183,14 @@ enum {
 	/** @brief Invalid or unexpected UTF-8 character. */
 	BNJ_ERR_UTF_8,
 
+	/** @brief UTF-16 surrogate error. */
+	BNJ_ERR_UTF_SURROGATE,
+
+	/** @brief Just used for counting number of error types. */
+	BNJ_ERROR_SENTINEL,
+
 	/** @brief Number of errors defined. */
-	BNJ_ERROR_COUNT = BNJ_ERR_UTF_8 - BNJ_ERROR_MASK + 1
+	BNJ_ERROR_COUNT = BNJ_ERROR_SENTINEL - BNJ_ERROR_MASK
 };
 
 #define BNJ_EMPTY_CP 0x80000000
@@ -302,6 +308,9 @@ typedef struct bnj_state_s{
 	/** @brief How many digits preceded the decimal. -1 if no decimal. */
 	int32_t _decimal_offset;
 
+	/** @brief PAF last fragmented code point. */
+	uint32_t _cp_fragment;
+
 	/** @brief Supremum of key set tracking. */
 	uint16_t _key_set_sup;
 
@@ -316,9 +325,6 @@ typedef struct bnj_state_s{
 
 	/** @brief PAF exp_val */
 	int16_t _paf_exp_val;
-
-	/** @brief PAF last fragmented code point. */
-	uint16_t _cp_fragment;
 
 	/** @brief PAF significand value. */
 	SIGNIFICAND _paf_significand_val;

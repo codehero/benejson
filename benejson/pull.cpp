@@ -8,7 +8,6 @@
 #include "pull.hh"
 
 static const char* s_error_msgs[BNJ_ERROR_COUNT] = {
-	"",
 	"Extra comma",
 	"No comma",
 	"Invalid char after {",
@@ -24,7 +23,8 @@ static const char* s_error_msgs[BNJ_ERROR_COUNT] = {
 	"Invalid char in reserved word",
 	"List/map mismatch",
 	"Missing colon",
-	"Invalid UTF-8 char"
+	"Invalid UTF-8 char",
+	"Invalid UTF-16 surrogate encoding"
 };
 
 static const char* s_type_strings[] = {
@@ -92,7 +92,7 @@ unsigned BNJ::PullParser::Consume8(char* dest, unsigned destlen,
 		if(_utf8_remaining){
 			if(key_enum != 0xFFFFFFFF && val.key_enum != key_enum)
 				s_throw_key_error(*this, key_enum);
-			if((val.type & BNJ_TYPE_MASK) != BNJ_STRING)
+			if(bnj_val_type(&val) != BNJ_STRING)
 				s_throw_type_error(*this, BNJ_STRING);
 
 			const uint8_t* x = Buff();
