@@ -32,7 +32,7 @@ namespace BNJ {
 				/** @brief Begin state. */
 				ST_BEGIN,
 
-				/** @brief No more data to parse. End state. */
+				/** @brief No more data to parse. Final state. */
 				ST_NO_DATA,
 
 				/** @brief After Pull(), Parser descended into a map. */
@@ -43,10 +43,6 @@ namespace BNJ {
 
 				/** @brief After Pull(), Parser read new datum. Depth remains the same. */
 				ST_DATUM,
-
-				/** @brief After Pull(), Parser read string whose size exceeded buffer
-				 * size. The . */
-				ST_LONG,
 
 				/** @brief Ascend out of map. */
 				ST_ASCEND_MAP,
@@ -79,6 +75,9 @@ namespace BNJ {
 					const unsigned file_offset;
 			};
 
+
+			/* Ctor/dtor. */
+
 			/** @brief Initialize with scratch space and input retrieval
 			 *  @param maxdepth Maximum json depth to parse.  */
 			PullParser(unsigned maxdepth, uint32_t* stack);
@@ -86,23 +85,38 @@ namespace BNJ {
 			~PullParser();
 
 
-			/* Accessors. */
+			/* Iteration operations. */
 
-			/** @brief Prepare parser for iteration operations. Allows instance reuse.
-			 *  @param buffer Where to buffer character data.
+			/** @brief Prepare parser for iteration operations.
+			 *  Does NOT Pull any values.
+			 *  Allows instance reuse.
+			 *  @param buffer Where to buffer character data during parsing session.
+			 *  Do NOT mess with the contents of the buffer while parsing!
 			 *  @param len Size of buffer
 			 *  @param reader From where to pull data. */
 			void Begin(uint8_t* buffer, unsigned len, Reader* reader) throw();
 
-			/** @brief Access to character buffer (same as buffer in Begin()). */
-			const uint8_t* Buff(void) const;
+			/** @brief Pull next value
+			 *  Calling Pull() invalidates values from a previous Pull() call.
+			 *  @param key_set Lexigraphically sorted array of keys to match
+			 *  @param key_set_length length of key_set
+			 *  @return New parser state
+			 *  @throw on parsing errors */
+			State Pull(char const * const * key_set = NULL, unsigned key_set_length = 0);
 
-			/** @brief Size of whole buffer. */
-			unsigned BuffLen(void) const;
+			/** @brief Jump out of deepest depth map/list.
+			 *  @return Context out of which left
+			 *  (ST_ASCEND_MAP or ST_ASCEND_LIST) */
+			State Up(void);
 
 
-			/** @brief Consume UTF-8 multibyte charactesr into user buffer.
+			/* Accessors. */
+
+			/** @brief Read a chunk of UTF-8 multibyte characters into user buffer.
 			 *  -Note this can advance internal parsing c_state.
+			 *  -CONSEQUENTLY, THE KEY MAY DISAPPEAR AFTER FIRST CHUNKREAD CALL.
+			 *   IF YOU NEED TO READ THE KEY, READ IT BEFORE CALLING THIS!
+			 *   (you should identify the string before reading it anyway!)
 			 *  -Return value is 0 when no more chars to read
 			 *  -Only "whole" UTF-8 characters read.
 			 *  @param dest Where to store key string. If NULL, then just verifies.
@@ -113,50 +127,46 @@ namespace BNJ {
 			 *  If 0, then no more chars in the value. Next call should be Pull()
 			 *  @throw  type mismatch, key_enum mismatch
 			 *  or destlen < 4 bytes in size. */
-			unsigned Consume8(char* dest, unsigned destlen,
+			unsigned ChunkRead8(char* dest, unsigned destlen,
 				unsigned key_enum = 0xFFFFFFFF);
 
-			/* TODO Wide character version of Consume(). */
+			/* TODO UTF-16, UTF-32 versions of ChunkRead8(). */
 
 			/** @brief Get currently parsed value.
-			 *  @throw If parser does not currently hold a valid value. */
+			 *  @throw When parser state is not ST_DATUM */
 			const bnj_val& GetValue(void) const;
 
-			/** @brief Retrieve current parser state. */
+			/** @brief Retrieve current parser state.
+			 * @return After Begin() and before first Pull() call, returns ST_BEGIN.
+			 * Otherwise, identical to return value from Pull() */
 			State GetState(void) const;
+
+			/** @brief Convenience function to interpret state if parser descended.
+			 *  @return true if parser descended after Pull(); false otherwise. */
+			bool Descended(void) const;
+
+
+			/* Utility functions. */
 
 			/** @brief Get Reference to underlying C spj state. */
 			const bnj_state& c_state(void) const;
 
+			/** @brief Get pull parser depth.
+			 *  @return Current depth in JSON data. */
+			unsigned Depth(void) const;
+
+			/** @brief Access to character buffer (same as buffer in Begin()).
+			 *  AS OF THIS TIME, NOT FOR GENERIC USE! */
+			const uint8_t* Buff(void) const;
+
+			/** @brief Size of whole buffer.
+			 *  AS OF THIS TIME, NOT FOR GENERIC USE! */
+			unsigned BuffLen(void) const;
+
 			/** @brief Indicate at what file offset value begins. */
 			unsigned FileOffset(const bnj_val& v) const throw();
 
-			/** @brief Get pull parser depth. */
-			unsigned Depth(void) const;
-
-			/* Iteration operations. */
-
-			/** @brief Read next value
-			 *  Calling Pull() invalidates values from a previous Pull() call.
-			 *  @param key_set Lexigraphically sorted array of keys to match
-			 *  @param key_set_length length of key_set
-			 *  @return New parser state
-			 *  @throw on parsing errors */
-			State Pull(char const * const * key_set = NULL, unsigned key_set_length = 0);
-
-			/** @brief Skip over all remaining data in a context until depth rises by 1.
-			 *  @return 1 if ascended; 0 if at end of parsing. */
-			void Up(void);
-
-
 		private:
-			enum {
-				/** @brief Filling the buffer. */
-				READ_ST,
-
-				/** @brief Parsing character data in buffer. */
-				PARSE_ST
-			};
 
 			/** @brief Private default ctor to prevent inheritance. */
 			PullParser(void);
@@ -169,7 +179,8 @@ namespace BNJ {
 			 *  @throw On input error. */
 			void FillBuffer(unsigned end_bound);
 
-			/** @brief Internal value buffer. */
+			/** @brief Internal value buffer.
+			 * Presently, 4 is arbitrarily chosen, may change in the future... */
 			bnj_val _valbuff[4];
 
 			/** @brief Current value index. */
@@ -256,14 +267,6 @@ namespace BNJ {
 
 /* Inlines */
 
-inline const uint8_t* BNJ::PullParser::Buff(void) const{
-	return _buffer + _offset;
-}
-
-inline unsigned BNJ::PullParser::BuffLen(void) const{
-	return _len;
-}
-
 inline const bnj_val& BNJ::PullParser::GetValue(void) const{
 	if(_val_idx >= _val_len)
 		throw std::runtime_error("No valid parser value!");
@@ -274,12 +277,24 @@ inline BNJ::PullParser::State BNJ::PullParser::GetState(void) const{
 	return _parser_state;
 }
 
+inline bool BNJ::PullParser::Descended(void) const{
+	return (_parser_state == ST_MAP || _parser_state == ST_LIST);
+}
+
 inline const bnj_state& BNJ::PullParser::c_state(void) const{
 	return _pstate;
 }
 
 inline unsigned BNJ::PullParser::Depth(void) const{
 	return _depth;
+}
+
+inline const uint8_t* BNJ::PullParser::Buff(void) const{
+	return _buffer + _offset;
+}
+
+inline unsigned BNJ::PullParser::BuffLen(void) const{
+	return _len;
 }
 
 #endif
