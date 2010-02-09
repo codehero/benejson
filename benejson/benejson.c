@@ -116,36 +116,6 @@ static uint8_t s_hex(uint8_t c){
 	return (c <= '9') ? c - '0' : (c & 0xDF) -'7';
 }
 
-static inline uint8_t* s_write_utf8(uint8_t* dst, const uint8_t* end,
-	unsigned v)
-{
-	/* Write UTF-8 encoded value. Advance dst to point to last byte. */
-	/* If not enough space remaining do nothing. */
-	if(v < 0x80 && end - dst >= 1){
-		dst[0] = v;
-		++dst;
-	}
-	else if(v < 0x800 && end - dst >= 2){
-		dst[1] = 0x80 | (v & 0x3F); v >>= 6;
-		dst[0] = 0xC0 | v;
-		dst += 2;
-	}
-	else if(v < 0x10000 && end - dst >= 3){
-		dst[2] = 0x80 | (v & 0x3F); v >>= 6;
-		dst[1] = 0x80 | (v & 0x3F); v >>= 6;
-		dst[0] = 0xE0 | v;
-		dst += 3;
-	}
-	else if(end - dst >= 4){
-		dst[3] = 0x80 | (v & 0x3F); v >>= 6;
-		dst[2] = 0x80 | (v & 0x3F); v >>= 6;
-		dst[1] = 0x80 | (v & 0x3F); v >>= 6;
-		dst[0] = 0xF0 | v;
-		dst += 4;
-	}
-	return dst;
-}
-
 static inline void s_reset_state(bnj_state* state){
 	state->depth_change = 0;
 	state->vi = 0;
@@ -1122,16 +1092,17 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 	return i;
 }
 
-uint8_t* bnj_fragshift(bnj_val* frag, uint8_t* buffer, uint32_t* len){
+uint8_t* bnj_fragcompact(bnj_val* frag, uint8_t* buffer, uint32_t* len){
+	unsigned begin = 0;
 	/* Check incomplete key. Implies no value read. */
 	if(frag->type & BNJ_VFLAG_KEY_FRAGMENT){
 		/* Move key to the beginning of the buffer.
 		 * ASSUMING no overlap between src and dst!! */
 		memcpy(buffer, buffer + frag->key_offset, frag->key_length);
 
-		/* Available space reduced by key length. */
-		*len -= frag->key_length;
-		return buffer + frag->key_length;
+		/* Shift offset to beginning of buffer. */
+		frag->key_offset = 0;
+		begin = frag->key_length;
 	}
 
 	/* Check incomplete value. If a string copy to beginning of buffer. */
@@ -1139,23 +1110,15 @@ uint8_t* bnj_fragshift(bnj_val* frag, uint8_t* buffer, uint32_t* len){
 		if((frag->type & BNJ_TYPE_MASK) == BNJ_STRING){
 			/* String ends at end of buffer, so length = (end - offset). */
 			unsigned slen = *len - frag->strval_offset;
-			memcpy(buffer, buffer + frag->strval_offset, slen);
+			memcpy(buffer + begin, buffer + frag->strval_offset, slen);
 
-			/* If completed key, then its start will bound the buffer. */
-			if(frag->key_length)
-				*len = frag->key_offset;
-
-			/* Subtract string length from available space. */
-			*len -= slen;
-			return buffer + slen;
+			/* Advance new buffer begin by string length. */
+			begin += slen;
 		}
 	}
 
-	/* If completed key, then its start will bound the buffer. */
-	if(frag->key_length)
-		*len = frag->key_offset;
-
-	return buffer;
+	*len -= begin;
+	return buffer + begin;
 }
 
 uint8_t* bnj_json2utf8(uint8_t* dst, size_t destlen, const uint8_t** buff){
@@ -1263,7 +1226,7 @@ uint8_t* bnj_json2utf8(uint8_t* dst, size_t destlen, const uint8_t** buff){
 
 						/* Write UTF-8 char.
 						 * If not enough space in dst, back off and return. */
-						uint8_t* res = s_write_utf8(dst, end, v);
+						uint8_t* res = bnj_utf8_char(dst, end - dst, v);
 						if(dst != res)
 							dst = res;
 						else{
@@ -1291,32 +1254,34 @@ uint8_t* bnj_json2utf8(uint8_t* dst, size_t destlen, const uint8_t** buff){
 inline uint8_t* bnj_stpncpy8(uint8_t* dst, const bnj_val* src, size_t len,
 	const uint8_t* buff)
 {
-	size_t clen = bnj_strlen8(src);
-	if(clen && len){
-		/* Save space for null terminator. */
-		--len;
+	if(len){
+		size_t clen = bnj_strlen8(src);
+		if(clen){
+			/* Save space for null terminator. */
+			--len;
 
-		/* Copy fragmented char if applicable. */
-		if(src->significand_val != BNJ_EMPTY_CP){
-			uint8_t* res = s_write_utf8(dst, dst + len, (uint32_t)src->significand_val);
-			if(dst != res){
-				len -= res - dst;
-				clen -= res - dst;
-				dst = res;
+			/* Copy fragmented char if applicable. */
+			if(src->significand_val != BNJ_EMPTY_CP){
+				uint8_t* res =
+					bnj_utf8_char(dst, len, (uint32_t)src->significand_val);
+				if(dst != res){
+					len -= res - dst;
+					clen -= res - dst;
+					dst = res;
+				}
+				else{
+					*dst = '\0';
+					return dst;
+				}
 			}
-			else
-				return dst;
+
+			/* Only copy up to minimum of len and content length. */
+			const uint8_t* b = buff + src->strval_offset;
+			dst = bnj_json2utf8(dst, (clen < len) ? clen : len, &b);
 		}
-
-
-		/* Only copy up to minimum of len and content length. */
-		const uint8_t* b = buff + src->strval_offset;
-		uint8_t* res = bnj_json2utf8(dst, (clen < len) ? clen : len, &b);
-		*res = '\0';
-		return res;
+		*dst = '\0';
 	}
-	else
-		return dst;
+	return dst;
 }
 
 #ifdef BNJ_WCHAR_SUPPORT

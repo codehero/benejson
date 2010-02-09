@@ -360,12 +360,13 @@ bnj_state* bnj_state_init(bnj_state* st, uint32_t* state_buffer, uint32_t stack_
 const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len);
 
 /** @brief Helper function for fragment management.
+ *  Moves key:value fragments to beginning of buffer.
  *  @param frag Fragmented key:value.
  *  @param buffer Input buffer that was passed to bnj_parse.
  *  @param len Size of input buffer; on return, contains number of free bytes
  *  following the return value.
  *  @return First empty byte in the buffer. */
-uint8_t* bnj_fragshift(bnj_val* frag, uint8_t* buffer, uint32_t* len);
+uint8_t* bnj_fragcompact(bnj_val* frag, uint8_t* buffer, uint32_t* len);
 
 
 /* String length counting functions. */
@@ -427,6 +428,14 @@ uint8_t* bnj_stpncpy8(uint8_t* dst, const bnj_val* src, size_t len,
  *  @param buff Source data; Upon return points to where parsing stopped.
  *  @return Pointer to next unwritten byte after dst. */
 uint8_t* bnj_json2utf8(uint8_t* dst, size_t destlen, const uint8_t** buff);
+
+/** @brief Utility function to convert code point to utf encoding
+ * Does NOT null terminate.
+ *  @param dst Where to store UTF-8 output.
+ *  @param len Number of bytes in dst.
+ *  @param cp code point value.
+ *  @return Pointer to next unwritten byte after dst. */
+uint8_t* bnj_utf8_char(uint8_t* dst, unsigned len, uint32_t cp);
 
 #ifdef BNJ_WCHAR_SUPPORT
 
@@ -516,6 +525,33 @@ inline uint8_t* bnj_stpcpy8(uint8_t* dst, const bnj_val* src,
 	return bnj_stpncpy8(dst, src, bnj_strlen8(src) + 1, buff);
 }
 
+inline uint8_t* bnj_utf8_char(uint8_t* dst, unsigned len, uint32_t v){
+	/* Write UTF-8 encoded value. Advance dst to point to last byte. */
+	/* If not enough space remaining do nothing. */
+	if(v < 0x80 && len >= 1){
+		dst[0] = v;
+		++dst;
+	}
+	else if(v < 0x800 && len >= 2){
+		dst[1] = 0x80 | (v & 0x3F); v >>= 6;
+		dst[0] = 0xC0 | v;
+		dst += 2;
+	}
+	else if(v < 0x10000 && len >= 3){
+		dst[2] = 0x80 | (v & 0x3F); v >>= 6;
+		dst[1] = 0x80 | (v & 0x3F); v >>= 6;
+		dst[0] = 0xE0 | v;
+		dst += 3;
+	}
+	else if(len >= 4){
+		dst[3] = 0x80 | (v & 0x3F); v >>= 6;
+		dst[2] = 0x80 | (v & 0x3F); v >>= 6;
+		dst[1] = 0x80 | (v & 0x3F); v >>= 6;
+		dst[0] = 0xF0 | v;
+		dst += 4;
+	}
+	return dst;
+}
 
 #ifdef BNJ_WCHAR_SUPPORT
 
