@@ -79,7 +79,7 @@ void OutputValue(BNJ::PullParser& parser){
 
 				/* Consume/Write loop */
 				fprintf(stdout, "string: '");
-				while((len = parser.Consume8(buffer, 1024)))
+				while((len = parser.ChunkRead8(buffer, 1024)))
 					fwrite(buffer, 1, len, stdout);
 				fprintf(stdout, "'\n");
 			}

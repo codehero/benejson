@@ -1,0 +1,41 @@
+{
+	"metadata":{
+		"dbsource":"http://localhost/spams/291831",
+		"irrelevant":{
+			"x":"y",
+			"nonsense":"ubzub"
+		},
+		"spam_agent":"SpamSuperTerminator",
+		"some_array":[
+			1,
+			"q",
+			4.3,
+			{
+				"key":"value"
+			}
+		],
+		"empty_stuff":[
+			{},
+			[[[]]],
+		],
+		"spam_score":0.9999,
+		"key5":12
+	},
+	"header":{
+		"recv_date":{
+			"year":2010,
+			"month":2,
+			"day":9,
+			"hour":0,
+			"minute":11
+		},
+		"subject":"URGENT: UPS COURIER COMPANY IS WAITING FOR YOU.",
+		"from":"dargheelzu@geocities.com",
+		"to":"gullible@blackwater.gov",
+		"cc":[
+			"scams@whitehouse.gov",
+			"foolish@whitehouse.gov",
+			"mileyfan@nasa.gov"
+		]
+	},
+	"body":"Good day to you.\n\n\nI have been waiting for you since to contact me for your Confirmable Bank Draft of $850,000United States Dollars,but I did not hear from you since for a\n\ncouple of weeks now.\n\n\nThen I went to the bank to confirm if the draft has expired or getting near to the date of expire and Dr.Wilson the Director Bank of Africa told me that\n\nbefore the draft will get to your hand that it will expire.\n\n\nSo I told him to cash the $850,000 USD UNITED STATES DOLLARS to cash payment to avoid losing this funds under expiration as I will be out of the country for\n\na 3 Months Course and I will not come back till ending of  May 2010. What you have to do now is to contact UPS COURIER COMPANY as soon as possible to know\n\nwhen they will deliver your Consignment to you because of the expiring date.\n\n\nFor your information,i have paid for the delivering Charge,Insurance premium.The only money you will send to the UPS COURIER COMPANY to deliver your\n\nConsignment direct to yourpostal Address in your country is ($100 USD) one hundred United States Dollars only being Security Keeping Fee of the Courier\n\nCompany so far.\n\n\nI would have paid that but they said no because they don't know when you will contact them and in case of demurrage.\n\n\nYou have to contact UPS COURIER COMPANY now,for the delivery of your package with this information below.\n\n\n1.Your Full Name:\n2.Your Delivery Address:\n3.Your Cell Phone Number:\n4.Your Country:\n\n\nCompany's Name:UPS COURIER COMPANY\n\nDirectors Name: MR.MAYOWA BENSON\n\nEmail Address: mayor_benson@ig.com.br\n\nPrivate Number: +234 704 2172 485 (CALL OR TEXT)\n\nFinally,make sure that you reconfirm your Postal address and Direct telephone number to them again to avoid any mistake on the Delivery and ask them to give\n\nyou the tracking number, after you have sent the Security Keeping Fee to them,to enable you track your package over there and know when it will get to your\n\ndoor step so that you can sign on it.\n\n   \nLet me repeat again,contact them as soon as you receive this mail and ask them how you will make the security fee of $100USD to them to avoid any further\n\ndelay any remember to pay them their Security Keeping fee of $100USD for their immediate action.\n\n\nNOTE:The UPS COURIER COMPANY don't know the content of the Box. I registered it as a BOX of Africa cloths.They dont know the contents is money this is to\n\navoid them delaying with the BOX. Don't let them know that your box content is money okay.\n\nMrs.Jessica Brown"}
