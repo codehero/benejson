@@ -230,7 +230,7 @@ void OnHeader(PullParser& parser){
 						throw std::runtime_error("Too many fields in date!");
 
 					/* Print the data. YEAR-MONTH-DAY HOUR:MINUTE*/
-					fprintf(stdout, "date: %d-%02d-%d %02d:%02d\n",
+					fprintf(stdout, "date: %d-%02d-%02d %02d:%02d\n",
 						date[KEY_YEAR], date[KEY_MONTH], date[KEY_DAY],
 						date[KEY_HOUR], date[KEY_MINUTE]);
 				}
