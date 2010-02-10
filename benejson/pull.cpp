@@ -374,11 +374,8 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 }
 
 BNJ::PullParser::State BNJ::PullParser::Up(void){
-	const unsigned dest_depth = _depth - 1;
-
-	unsigned st = _pstate.stack[_depth];
-
 	/* Loop until parser depth goes above destination depth. Drop the data. */
+	const unsigned dest_depth = _depth - 1;
 	while(dest_depth < _depth)
 		Pull();
 	return _parser_state;
@@ -488,6 +485,25 @@ void BNJ::Get(double& d, const PullParser& p, unsigned key_enum){
 	}
 	else
 		s_throw_type_error(p, BNJ_NUMERIC);
+}
+
+void BNJ::Get(bool& b, const PullParser& p, unsigned key_enum){
+	const bnj_val& val = p.GetValue();
+	if(key_enum != 0xFFFFFFFF && val.key_enum != key_enum)
+		s_throw_key_error(p, key_enum);
+
+	unsigned t = bnj_val_type(&val);
+	if(BNJ_SPECIAL == t){
+		if(BNJ_SPC_FALSE == t){
+			b = false;
+			return;
+		}
+		else if(BNJ_SPC_TRUE == t){
+			b = true;
+			return;
+		}
+	}
+	s_throw_type_error(p, BNJ_SPECIAL);
 }
 
 
