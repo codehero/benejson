@@ -107,7 +107,10 @@ enum {
 	BNJ_VFLAG_VAL_FRAGMENT = 0x40,
 
 	/** @brief Key is only a fragment. Consequently no value data. */
-	BNJ_VFLAG_KEY_FRAGMENT = 0x80
+	BNJ_VFLAG_KEY_FRAGMENT = 0x80,
+
+	/** @brief Key completed, but value fragment not yet started. */
+	BNJ_VFLAG_MIDDLE = 0x8
 };
 
 
@@ -488,8 +491,8 @@ inline unsigned bnj_cpcount(const bnj_val* src){
 }
 
 inline unsigned bnj_incomplete(const bnj_state* state, const bnj_val* src){
-	return ((src->type & (BNJ_VFLAG_VAL_FRAGMENT | BNJ_VFLAG_KEY_FRAGMENT))
-		|| (state->stack[state->depth] & BNJ_VAL_INCOMPLETE));
+	return (src->type &
+	(BNJ_VFLAG_VAL_FRAGMENT | BNJ_VFLAG_KEY_FRAGMENT | BNJ_VFLAG_MIDDLE));
 }
 
 inline unsigned bnj_val_type(const bnj_val* src){
