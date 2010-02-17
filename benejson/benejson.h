@@ -368,8 +368,19 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len);
  *  @return First empty byte in the buffer. */
 uint8_t* bnj_fragcompact(bnj_val* frag, uint8_t* buffer, uint32_t* len);
 
+/** @brief Determine whether value was incompletely read.
+ *  @param src Value in question
+ *  @return 1 if incomplete, 0 if not. */
+unsigned bnj_incomplete(const bnj_state* state, const bnj_val* src);
+
+
 
 /* String length counting functions. */
+
+/** @brief Get UTF-8 string value length count.
+ *  @param src BNJ value containing BNJ_STRING string data.
+ *  @return UTF-8 encoded string length. */
+unsigned bnj_strlen8(const bnj_val* src);
 
 /** @brief Get number of code points (NOT necessarily number of "characters")
  *  @param src BNJ value containing BNJ_STRING string data.
@@ -390,11 +401,6 @@ unsigned bnj_strlen16(const bnj_val* src);
  *  @param src BNJ value containing BNJ_STRING string data.
  *  @return UTF-32 encoded string length. */
 unsigned bnj_strlen32(const bnj_val* src);
-
-/** @brief Determine whether value was incompletely read.
- *  @param src Value in question
- *  @return 1 if incomplete, 0 if not. */
-unsigned bnj_incomplete(const bnj_state* state, const bnj_val* src);
 
 /* String copy functions. */
 
