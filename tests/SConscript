@@ -14,9 +14,12 @@ pulltest = bin_env.Program("pulltest", source = [posix, "pulltest.cpp"], LIBS=Sp
 
 spam = bin_env.Program("spam", source = [posix, "spam.cpp"], LIBS=Split("benejson m"));
 
+jsontool = bin_env.Program("jsontool", source = ["jsontool.c"], LIBS=Split("benejson m"));
+
 bin_env.Install(bin_env.BinDest, step)
 bin_env.Install(bin_env.BinDest, json)
 bin_env.Install(bin_env.BinDest, jbuff)
 bin_env.Install(bin_env.BinDest, pulltest)
 bin_env.Install(bin_env.BinDest, strtest)
 bin_env.Install(bin_env.BinDest, spam)
+bin_env.Install(bin_env.BinDest, jsontool)
