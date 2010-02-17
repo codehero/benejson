@@ -631,7 +631,7 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 						SETSTATE(state->flags, BNJ_ERR_INVALID);
 						return i;
 					}
-					else if(*i & 0x80){
+					else if(*i & 0x80 && !(curval->type & BNJ_VFLAG_KEY_FRAGMENT)){
 						/* Process first byte. */
 						state->_cp_fragment = *i;
 						if((*i & 0xF8) == 0xF0){
@@ -782,7 +782,7 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 								curval->key_enum = state->user_ctx->key_set_length;
 						}
 					}
-					else if(*i == '\\'){
+					else if(*i == '\\' && !(curval->type & BNJ_VFLAG_KEY_FRAGMENT)){
 						/* Escape sequence, initialize fragment to 0. */
 						state->_cp_fragment = 0;
 						++i;
