@@ -135,7 +135,7 @@ unsigned BNJ::PullParser::ChunkRead8(char* dest, unsigned destlen,
 		/* Pull will do the work of updating the buffer here.
 		 * Jump directly to PARSE_ST so Pull() will not jump back here! */
 		_state = PARSE_ST;
-		State s = Pull();
+		State s = Pull(_ctx.key_set, _ctx.key_set_length);
 		assert(ST_DATUM == s);
 	}
 
@@ -200,6 +200,12 @@ unsigned BNJ::PullParser::FileOffset(const bnj_val& v) const throw(){
 BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 	unsigned key_set_length)
 {
+
+	/* For now, always set new user keys.
+	 * FIXME: Is there a better spot for this assignment? */
+	_ctx.key_set = key_set;
+	_ctx.key_set_length = key_set_length;
+
 	/* If incoming on value, then user must have gotten value on last Pull().
 	 * Advance to next value. If at end, parse more data. */
 	if(VALUE_ST == _state){
@@ -218,11 +224,6 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 		if(_val_len == _val_idx)
 			_state = DEPTH_LAG_ST;
 	}
-
-	/* For now, always set new user keys.
-	 * FIXME: Is there a better spot for this assignment? */
-	_ctx.key_set = key_set;
-	_ctx.key_set_length = key_set_length;
 
 	/* No fragments entering the switch loop. */
 	unsigned frag_key_len = 0;

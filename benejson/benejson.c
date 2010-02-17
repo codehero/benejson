@@ -1,7 +1,6 @@
 /* Copyright (c) 2010 David Bender assigned to Benegon Enterprises LLC
  * See the file LICENSE for full license information. */
 
-//#include <stdio.h>
 #include <assert.h>
 #include "benejson.h"
 
@@ -371,6 +370,7 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 					else {
 						/* Otherwise this is a string value. */
 						curval->type = BNJ_STRING | BNJ_VFLAG_VAL_FRAGMENT;
+						curval->type &= ~BNJ_VFLAG_MIDDLE;
 						curval->strval_offset = i - buffer;
 
 						/* Zero character count and byte count. */
@@ -423,6 +423,9 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 						++state->vi;
 						curval = state->v + state->vi;
 						curval->key_length = 0;
+					}
+					else{
+						curval->type = 0;
 					}
 
 					/* Comma is OK to see at old depth. */
@@ -488,6 +491,7 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 							/* Set new state. */
 							SETSTATE(state->flags,  BNJ_RESERVED);
 							curval->type |= BNJ_SPECIAL | BNJ_VFLAG_VAL_FRAGMENT;
+							curval->type &= ~BNJ_VFLAG_MIDDLE;
 
 							/* For internal use, abuse exp_val as character counter. */
 						}
@@ -505,6 +509,7 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 
 						SETSTATE(state->flags,  BNJ_SIGNIFICAND);
 						curval->type |= BNJ_VFLAG_VAL_FRAGMENT | BNJ_NUMERIC;
+						curval->type &= ~BNJ_VFLAG_MIDDLE;
 						state->digit_count = 0;
 						state->_decimal_offset = -1;
 				}
@@ -775,11 +780,15 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 						}
 						else{
 							/* ':' character "ends" the key. Clear key incomplete status. */
-							SETSTATE(state->flags,BNJ_COLON);
+							SETSTATE(state->flags, BNJ_COLON);
 							curval->type &= ~BNJ_VFLAG_KEY_FRAGMENT;
+							curval->type |= BNJ_VFLAG_MIDDLE;
 							state->stack[state->depth] &= ~BNJ_KEY_INCOMPLETE;
 							if(state->_key_set_sup == curval->key_enum)
 								curval->key_enum = state->user_ctx->key_set_length;
+
+							/* Preemptive reset. */
+							state->_key_len = 0;
 						}
 					}
 					else if(*i == '\\' && !(curval->type & BNJ_VFLAG_KEY_FRAGMENT)){
@@ -1035,6 +1044,7 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 
 			case BNJ_END_VALUE2:
 					curval->type = 0;
+					state->_paf_type = 0;
 
 					/* If depth == 0, then done parsing. */
 					if(0 == state->depth){
@@ -1074,8 +1084,9 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 	}
 
 	/* Ensure user sees fragment. */
-	if(bnj_incomplete(state, curval))
+	if(bnj_incomplete(state, curval)){
 		++state->vi;
+	}
 
 	/* Ensure unseen values pushed to user if cb. */
 	if(state->vi){
@@ -1089,13 +1100,17 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 		state->_paf_exp_val = curval->exp_val;
 		state->_paf_significand_val = curval->significand_val;
 	}
+	else{
+		state->_paf_type = 0;
+	}
 	return i;
 }
 
 uint8_t* bnj_fragcompact(bnj_val* frag, uint8_t* buffer, uint32_t* len){
 	unsigned begin = 0;
 	/* Check incomplete key. Implies no value read. */
-	if(frag->type & BNJ_VFLAG_KEY_FRAGMENT){
+	//if(frag->type & BNJ_VFLAG_KEY_FRAGMENT){
+	if(frag->key_length){
 		/* Move key to the beginning of the buffer.
 		 * ASSUMING no overlap between src and dst!! */
 		memcpy(buffer, buffer + frag->key_offset, frag->key_length);
