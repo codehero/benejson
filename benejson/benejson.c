@@ -417,12 +417,13 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 					if(BNJ_OBJECT == type)
 						state->stack[state->depth] |= BNJ_KEY_INCOMPLETE;
 
-					/* If there is a key on current depth, add it to value list. */
-					if(curval->key_length){
+					/* If currently parsing map, then add this to value list. */
+					if(state->stack[state->depth - 1] & 1){
 						curval->type = (BNJ_OBJECT == type) ? BNJ_OBJ_BEGIN : BNJ_ARR_BEGIN;
 						++state->vi;
 						curval = state->v + state->vi;
 						curval->key_length = 0;
+						state->_key_len = 0;
 					}
 					else{
 						curval->type = 0;

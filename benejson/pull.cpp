@@ -261,9 +261,6 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 						_offset = _first_unparsed;
 					}
 					else{
-						/* This necessitates having read a value or fragment. */
-						assert(_pstate.vi);
-
 						/* Restore key length to first value.
 						 * Increment since more chars may have been added. */
 						_pstate.v->key_length += frag_key_len;
@@ -274,6 +271,7 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 							_pstate.v[i].key_offset += frag_key_len;
 							_pstate.v[i].strval_offset += frag_key_len;
 						}
+						_pstate.v->key_offset += 0;
 
 						frag_key_len = 0;
 						_offset = 0;
@@ -495,11 +493,11 @@ void BNJ::Get(bool& b, const PullParser& p, unsigned key_enum){
 
 	unsigned t = bnj_val_type(&val);
 	if(BNJ_SPECIAL == t){
-		if(BNJ_SPC_FALSE == t){
+		if(BNJ_SPC_FALSE == val.significand_val){
 			b = false;
 			return;
 		}
-		else if(BNJ_SPC_TRUE == t){
+		else if(BNJ_SPC_TRUE == val.significand_val){
 			b = true;
 			return;
 		}
@@ -512,8 +510,8 @@ void BNJ::VerifyNull(const PullParser& p, unsigned key_enum){
 	const bnj_val& val = p.GetValue();
 	if(key_enum != 0xFFFFFFFF && val.key_enum != key_enum)
 		s_throw_key_error(p, key_enum);
-	if(bnj_val_type(&val) != BNJ_SPC_NULL
-		&& val.significand_val != BNJ_SPC_NULL)
+	if(bnj_val_type(&val) != BNJ_SPECIAL
+		|| val.significand_val != BNJ_SPC_NULL)
 	{
 		s_throw_type_error(p, BNJ_SPECIAL);
 	}
