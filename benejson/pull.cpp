@@ -52,7 +52,7 @@ static void s_throw_key_error(const BNJ::PullParser& p, unsigned key_enum){
 	char buffer[1024];
 	char* x;
 	x = stpcpy(buffer, "Key mismatch: expected ");
-	x = stpcpy(x, p.c_state().user_ctx->key_set[key_enum]);
+	x = stpcpy(x, p.c_ctx().key_set[key_enum]);
 	x = stpcpy(x, ", found ");
 	bnj_stpkeycpy(x, &val, p.Buff());
 	throw BNJ::PullParser::input_error(buffer, p.FileOffset(val));
@@ -88,8 +88,6 @@ BNJ::PullParser::PullParser(unsigned maxdepth, uint32_t* stack_space)
 
 	/* Allocate the state stack. */
 	bnj_state_init(&_pstate, stack_space, maxdepth);
-
-	_pstate.user_ctx = &_ctx;
 }
 
 BNJ::PullParser::~PullParser(){
@@ -250,8 +248,8 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 
 					/* Set offset to where parsing begins. Parse data.
 					 * Advance first unparsed to where parsing ended. */
-					const uint8_t* res = bnj_parse(&_pstate, _buffer + _first_unparsed,
-						_first_empty - _first_unparsed);
+					const uint8_t* res = bnj_parse(&_pstate, &_ctx,
+						_buffer + _first_unparsed, _first_empty - _first_unparsed);
 
 					/* Abort on error. */
 					if(_pstate.flags & BNJ_ERROR_MASK)

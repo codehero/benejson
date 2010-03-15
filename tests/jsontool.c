@@ -264,8 +264,8 @@ int on_fragment(rules_parse_state* rps, const bnj_state* state,
 	return 0;
 }
 
-int rules_cb(const bnj_state* state, const uint8_t* buff){
-	rules_parse_state* rps = (rules_parse_state*)state->user_data;
+int rules_cb(const bnj_state* state, bnj_ctx* ctx, const uint8_t* buff){
+	rules_parse_state* rps = (rules_parse_state*)ctx->user_data;
 
 	if(state->vi){
 		/* Currently only handling a 1 level deep map.
@@ -317,14 +317,13 @@ int parse_rules(rules_parse_state* rps, bnj_state* st, int inputfd){
 	bnj_val values[16];
 	bnj_ctx ctx = {
 		.user_cb = rules_cb,
+		.user_data = rps,
 		.key_set = NULL,
 		.key_set_length = 0,
 	};
 
 	st->v = values;
 	st->vlen = 16;
-	st->user_ctx = &ctx;
-	st->user_data = rps;
 
 	init_rules_parse_state(rps);
 
@@ -337,7 +336,7 @@ int parse_rules(rules_parse_state* rps, bnj_state* st, int inputfd){
 		if(ret < 0)
 			return 1;
 
-		const uint8_t* res = bnj_parse(st, buff, ret);
+		const uint8_t* res = bnj_parse(st, &ctx, buff, ret);
 		if(st->flags & BNJ_ERROR_MASK){
 			printf("Error\n");
 			return 1;

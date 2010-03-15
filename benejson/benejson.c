@@ -123,8 +123,8 @@ static inline void s_reset_state(bnj_state* state){
 	state->v[0].key_enum = 0;
 }
 
-static inline void s_match_key(bnj_state* state, uint8_t target){
-	const char* const *const key_set = state->user_ctx->key_set;
+static inline void s_match_key(bnj_state* state, bnj_ctx* ctx, uint8_t target){
+	const char* const *const key_set = ctx->key_set;
 	uint16_t* key_enum = &(state->v[state->vi].key_enum);
 	const uint16_t* key_length = &(state->_key_len);
 	/* Adjust minimum if necessary. */
@@ -189,7 +189,9 @@ bnj_state* bnj_state_init(bnj_state* ret, uint32_t* stack, uint32_t stack_length
 	return ret;
 }
 
-const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
+const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
+	const uint8_t* buffer, uint32_t len)
+{
 	const uint8_t* i = buffer;
 	const uint8_t * const end = buffer + len;
 
@@ -257,8 +259,11 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 						/* If values saved to state->v and negative depth change,
 						 * return those values to the user. */
 						if(state->depth_change < 0){
-							if(state->user_ctx->user_cb){
-								state->user_ctx->user_cb(state, buffer);
+							if(uctx->user_cb){
+								if(uctx->user_cb(state, uctx, buffer)){
+									SETSTATE(state->flags, BNJ_ERR_USER);
+									return i;
+								}
 								s_reset_state(state);
 								curval = state->v;
 							}
@@ -283,8 +288,11 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 
 						/* If positive depth change, call user cb. */
 						if(state->depth_change > 0){
-							if(state->user_ctx->user_cb){
-								state->user_ctx->user_cb(state, buffer);
+							if(uctx->user_cb){
+								if(uctx->user_cb(state, uctx, buffer)){
+									SETSTATE(state->flags, BNJ_ERR_USER);
+									return i;
+								}
 								s_reset_state(state);
 								curval = state->v;
 							}
@@ -307,8 +315,11 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 						/* Terminate on reaching 0 depth.*/
 						if(0 == state->depth){
 							SETSTATE(state->flags, BNJ_SUCCESS);
-							if(state->user_ctx->user_cb){
-								state->user_ctx->user_cb(state, buffer);
+							if(uctx->user_cb){
+								if(uctx->user_cb(state, uctx, buffer)){
+									SETSTATE(state->flags, BNJ_ERR_USER);
+									return i;
+								}
 								s_reset_state(state);
 							}
 							return i;
@@ -342,8 +353,11 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 				if('"' == *i){
 					/* Alert user to depth change before reporting values.*/
 					if(state->depth_change){
-						if(state->user_ctx->user_cb){
-							state->user_ctx->user_cb(state, buffer);
+						if(uctx->user_cb){
+							if(uctx->user_cb(state, uctx, buffer)){
+								SETSTATE(state->flags, BNJ_ERR_USER);
+								return i;
+							}
 							s_reset_state(state);
 							curval = state->v;
 						}
@@ -364,7 +378,7 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 						curval->key_enum = 0;
 						curval->key_length = 0;
 						curval->key_offset = i - buffer;
-						state->_key_set_sup = state->user_ctx->key_set_length;
+						state->_key_set_sup = uctx->key_set_length;
 						state->_key_len = 0;
 					}
 					else {
@@ -442,8 +456,11 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 
 				/* Alert user to depth change before reporting values.*/
 				if(state->depth_change){
-					if(state->user_ctx->user_cb){
-						state->user_ctx->user_cb(state, buffer);
+					if(uctx->user_cb){
+						if(uctx->user_cb(state, uctx, buffer)){
+							SETSTATE(state->flags, BNJ_ERR_USER);
+							return i;
+						}
 						s_reset_state(state);
 						curval = state->v;
 					}
@@ -786,7 +803,7 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 							curval->type |= BNJ_VFLAG_MIDDLE;
 							state->stack[state->depth] &= ~BNJ_KEY_INCOMPLETE;
 							if(state->_key_set_sup == curval->key_enum)
-								curval->key_enum = state->user_ctx->key_set_length;
+								curval->key_enum = uctx->key_set_length;
 
 							/* Preemptive reset. */
 							state->_key_len = 0;
@@ -979,10 +996,10 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 						/* Normal character, just increment proper length. */
 						if(curval->type & BNJ_VFLAG_KEY_FRAGMENT){
 							/* Do enum check. */
-							if(state->user_ctx->key_set
+							if(uctx->key_set
 									&& (state->_key_set_sup != curval->key_enum))
 							{
-								s_match_key(state, *i);
+								s_match_key(state, uctx, *i);
 							}
 							++(curval->key_length);
 							++(state->_key_len);
@@ -1031,8 +1048,11 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 					/* Call user cb. */
 					++state->vi;
 					if(state->vi == state->vlen){
-						if(state->user_ctx->user_cb){
-							state->user_ctx->user_cb(state, buffer);
+						if(uctx->user_cb){
+							if(uctx->user_cb(state, uctx, buffer)){
+								SETSTATE(state->flags, BNJ_ERR_USER);
+								return i;
+							}
 							s_reset_state(state);
 						}
 						else{
@@ -1091,8 +1111,11 @@ const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len){
 
 	/* Ensure unseen values pushed to user if cb. */
 	if(state->vi){
-		if(state->user_ctx->user_cb){
-			state->user_ctx->user_cb(state, buffer);
+		if(uctx->user_cb){
+			if(uctx->user_cb(state, uctx, buffer)){
+				SETSTATE(state->flags, BNJ_ERR_USER);
+				return i;
+			}
 		}
 
 		/* PAF save. */

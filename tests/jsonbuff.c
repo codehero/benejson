@@ -19,7 +19,7 @@
 static unsigned s_width = 80;
 static unsigned curout = 0;
 
-int usercb(const bnj_state* state, const uint8_t* buff){
+int usercb(const bnj_state* state, bnj_ctx* ctx, const uint8_t* buff){
 	//printf("Call depth : %d,%d;", state->depth, state->depth_change);
 
 	//printf("Len %u;", state->digit_count);
@@ -91,12 +91,12 @@ int main(int argc, const char* argv[]){
 	bnj_state mstate;
 	bnj_ctx ctx = {
 		.user_cb = usercb,
+		.user_data = NULL,
 	};
 
 	bnj_state_init(&mstate, stackbuff, 128);
 	mstate.v = values;
 	mstate.vlen = 16;
-	mstate.user_ctx = &ctx;
 
 	uint8_t *buff = malloc(s_width + 1);
 	while(1){
@@ -108,7 +108,7 @@ int main(int argc, const char* argv[]){
 		if(ret < 0)
 			return 1;
 
-		const uint8_t* res = bnj_parse(&mstate, buff, ret);
+		const uint8_t* res = bnj_parse(&mstate, &ctx, buff, ret);
 		if(mstate.flags & BNJ_ERROR_MASK){
 			printf("Error\n");
 			return 1;
@@ -125,7 +125,7 @@ int main(int argc, const char* argv[]){
 	}
 
 	if(!(mstate.flags & BNJ_ERROR_MASK))
-		usercb(&mstate, NULL);
+		usercb(&mstate, &ctx, NULL);
 
 	free(buff);
 	return 0;

@@ -15,6 +15,7 @@ int main(int argc, const char* argv[]){
 	bnj_state mstate;
 	bnj_ctx ctx = {
 		.user_cb = NULL,
+		.user_data = NULL,
 		.key_set = NULL,
 		.key_set_length = 0,
 	};
@@ -25,8 +26,6 @@ int main(int argc, const char* argv[]){
 	bnj_state_init(&mstate, stackbuff, 128);
 	mstate.v = &value;
 	mstate.vlen = 1;
-
-	mstate.user_ctx = &ctx;
 
 	while(go){
 		uint8_t buff[2048];
@@ -43,7 +42,7 @@ int main(int argc, const char* argv[]){
 		const uint8_t* end = buff + ret;
 		const uint8_t* cur = buff;
 		while(cur != end){
-			const uint8_t* res = bnj_parse(&mstate, cur, 1);
+			const uint8_t* res = bnj_parse(&mstate, &ctx, cur, 1);
 			/* Print out state */
 			printf("{\"b\":\"0x%02x\", \"dc\":%3i, \"vi\":%3u, \"d\":%4u, \"dig\":%2u, "
 				"\"f\":\"0x%08x\", \"doff\":%2d, \"sv\":%20u, "

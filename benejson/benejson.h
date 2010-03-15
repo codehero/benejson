@@ -126,7 +126,10 @@ enum {
 	BNJ_VAL_INCOMPLETE = 0x2,
 
 	/** @brief Expecting a key, but not fully read yet. */
-	BNJ_KEY_INCOMPLETE = 0x4
+	BNJ_KEY_INCOMPLETE = 0x4,
+
+	/** @brief Mask over ARRAY,OBJECT */
+	BNJ_CTX_MASK = 0x1
 };
 
 
@@ -189,6 +192,9 @@ enum {
 	/** @brief UTF-16 surrogate error. */
 	BNJ_ERR_UTF_SURROGATE,
 
+	/** @brief User halted parsing. */
+	BNJ_ERR_USER,
+
 	/** @brief Just used for counting number of error types. */
 	BNJ_ERROR_SENTINEL,
 
@@ -204,16 +210,20 @@ enum {
 
 /* Forward declarations. */
 struct bnj_state_s;
+struct bnj_ctx_s;
 
 /** @brief Callback function type. */
-typedef int(*bnj_cb)(const struct bnj_state_s* state, const uint8_t* buff);
-
+typedef int(*bnj_cb)(const struct bnj_state_s* state, struct bnj_ctx_s* ctx,
+	const uint8_t* buff);
 
 /** @brief Parsing context structure. Governs general parsing behaviour. */
 typedef struct bnj_ctx_s{
 	/** @brief User's callback function. Called if not NULL; otherwise
 	 * bnj_parse returns with populated bnj_val. */
 	bnj_cb user_cb;
+
+	/** @brief User state data. May be changed during parsing. */
+	void* user_data;
 
 	/** @brief Sorted list of apriori known null terminated key strings.
 	 * THIS SHOULD NEVER CHANGE WHILE IN KEY FRAGMENT STATE. */
@@ -271,12 +281,6 @@ typedef struct bnj_val_s {
 typedef struct bnj_state_s{
 
 	/* User configurable fields. */
-
-	/** @brief Handle to context. May be changed during parsing. */
-	const bnj_ctx* user_ctx;
-
-	/** @brief User state data. May be changed during parsing. */
-	void* user_data;
 
 	/** @brief Array in which to store json values. */
 	bnj_val* v;
@@ -360,7 +364,7 @@ bnj_state* bnj_state_init(bnj_state* st, uint32_t* state_buffer, uint32_t stack_
  *  @param buffer character data to parse.
  *  @param len    Length of buffer.
  *  @return Where parsing ended. */
-const uint8_t* bnj_parse(bnj_state* state, const uint8_t* buffer, uint32_t len);
+const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* ctx, const uint8_t* buffer, uint32_t len);
 
 /** @brief Helper function for fragment management.
  *  Moves key:value fragments to beginning of buffer.
@@ -404,6 +408,7 @@ unsigned bnj_strlen16(const bnj_val* src);
  *  @param src BNJ value containing BNJ_STRING string data.
  *  @return UTF-32 encoded string length. */
 unsigned bnj_strlen32(const bnj_val* src);
+
 
 /* String copy functions. */
 
@@ -474,14 +479,21 @@ int bnj_wcscmp(const wchar_t* s1, const bnj_val* s2, const uint8_t* buff);
 
 #endif
 
+
+/* Value extraction functions. */
+
+/** @brief Extract boolean (0,1) from true/false value.
+	* @return 0 on false, 1 on true. */
+unsigned char bnj_bool(const bnj_val* src);
+
 #ifdef BNJ_FLOAT_SUPPORT
 
 /** @brief Extract double precision floating point from src.
- *  @return 0 if no errors; nonzero if error. */
+ *  @return src converted to double float value.. */
 double bnj_double(const bnj_val* src);
 
 /** @brief Extract double precision floating point from src.
- *  @return 0 if no errors; nonzero if error. */
+ *  @return src converted to single float value. */
 float bnj_float(const bnj_val* src);
 
 #endif
@@ -570,25 +582,45 @@ inline wchar_t* bnj_wcpcpy(wchar_t* dst, const bnj_val* src, const uint8_t* buff
 
 #endif
 
+inline unsigned char bnj_bool(const bnj_val* src){
+	return (BNJ_SPC_FALSE == src->significand_val) ? 0 : 1;
+}
+
 #ifdef BNJ_FLOAT_SUPPORT
 inline double bnj_double(const bnj_val* src){
-	/* First copy integral value. */
-	double dest = src->significand_val;
+	if(BNJ_NUMERIC == bnj_val_type(src)){
+		/* First copy integral value. */
+		double dest = src->significand_val;
 
-	/* Scale by exponent. */
-	dest *= pow(10, src->exp_val);
-	dest *= (src->type & BNJ_VFLAG_NEGATIVE_SIGNIFICAND) ? -1.0 : 1.0;
-	return dest;
+		/* Scale by exponent. */
+		dest *= pow(10, src->exp_val);
+		dest *= (src->type & BNJ_VFLAG_NEGATIVE_SIGNIFICAND) ? -1.0 : 1.0;
+		return dest;
+	}
+	else{
+		if(BNJ_SPC_NAN == src->significand_val)
+			return NAN;
+		else
+			return (src->type & BNJ_VFLAG_NEGATIVE_SIGNIFICAND) ? -INFINITY: INFINITY;
+	}
 }
 
 inline float bnj_float(const bnj_val* src){
-	/* First copy integral value. */
-	float dest = src->significand_val;
+	if(BNJ_NUMERIC == bnj_val_type(src)){
+		/* First copy integral value. */
+		float dest = src->significand_val;
 
-	/* Scale by exponent. */
-	dest *= powf(10, src->exp_val);
-	dest *= (src->type & BNJ_VFLAG_NEGATIVE_SIGNIFICAND) ? -1.0 : 1.0;
-	return dest;
+		/* Scale by exponent. */
+		dest *= powf(10, src->exp_val);
+		dest *= (src->type & BNJ_VFLAG_NEGATIVE_SIGNIFICAND) ? -1.0 : 1.0;
+		return dest;
+	}
+	else{
+		if(BNJ_SPC_NAN == src->significand_val)
+			return NAN;
+		else
+			return (src->type & BNJ_VFLAG_NEGATIVE_SIGNIFICAND) ? -INFINITY: INFINITY;
+	}
 }
 #endif
 

@@ -42,7 +42,7 @@ unsigned s_compare_good(unsigned i, const struct good_test* gt,
 	/* Verify UTF-8 conversion. */
 	uint8_t* res = bnj_stpcpy8(buffer, v, (uint8_t*)gt->json);
 	size_t diff = res - buffer;
-	unsigned expect = strlen(gt->utf8);
+	unsigned expect = strlen((char*)gt->utf8);
 	if(diff != expect){
 		fprintf(stdout, "UTF-8 length failure: %u expected %u, got %u\n",
 			i, (unsigned)diff, expect);
@@ -352,6 +352,7 @@ int main(int argc, const char* argv[]){
 	bnj_state mstate;
 	bnj_ctx ctx = {
 		.user_cb = NULL,
+		.user_data = NULL,
 		.key_set = NULL,
 		.key_set_length = 0,
 	};
@@ -369,10 +370,8 @@ int main(int argc, const char* argv[]){
 		mstate.v = values;
 		mstate.vlen = 16;
 
-		mstate.user_ctx = &ctx;
-
-		const uint8_t* res =
-			bnj_parse(&mstate, (uint8_t*)s_bad_values[i], strlen(s_bad_values[i]));
+		const uint8_t* res = bnj_parse(&mstate, &ctx, (uint8_t*)s_bad_values[i],
+			strlen(s_bad_values[i]));
 
 		/* Error should be detected. Verify correct detection. */
 		if(mstate.flags & BNJ_ERROR_MASK){
@@ -404,11 +403,9 @@ int main(int argc, const char* argv[]){
 		mstate.v = values;
 		mstate.vlen = 16;
 
-		mstate.user_ctx = &ctx;
-
 		for(unsigned x = 0; x < maxlen; ++x){
 			const uint8_t* res =
-				bnj_parse(&mstate, (uint8_t*)s_bad_values[i] + x, 1);
+				bnj_parse(&mstate, &ctx, (uint8_t*)s_bad_values[i] + x, 1);
 
 			/* Error should be detected. Verify correct detection. */
 			if(mstate.flags & BNJ_ERROR_MASK){
@@ -447,10 +444,8 @@ int main(int argc, const char* argv[]){
 		mstate.v = values;
 		mstate.vlen = 16;
 
-		mstate.user_ctx = &ctx;
-
 		const uint8_t* res =
-			bnj_parse(&mstate, (uint8_t*)s_good[i].json, strlen(s_good[i].json));
+			bnj_parse(&mstate, &ctx, (uint8_t*)s_good[i].json, strlen(s_good[i].json));
 
 		/* Error should be detected. Verify correct detection. */
 		if(mstate.flags & BNJ_ERROR_MASK){
@@ -480,8 +475,6 @@ int main(int argc, const char* argv[]){
 		mstate.v = values;
 		mstate.vlen = 16;
 
-		mstate.user_ctx = &ctx;
-
 		unsigned cp1_count = 0;
 		unsigned cp2_count = 0;
 		unsigned cp3_count = 0;
@@ -497,7 +490,7 @@ int main(int argc, const char* argv[]){
 		/* First do one by one. */
 		for(unsigned x = 0; x < maxlen; ++x){
 			const uint8_t* res =
-				bnj_parse(&mstate, (uint8_t*)s_good[i].json + x, 1);
+				bnj_parse(&mstate, &ctx, (uint8_t*)s_good[i].json + x, 1);
 			size_t diff = res - (uint8_t*)s_good[i].json;
 
 			/* Error should be detected. Verify correct detection. */

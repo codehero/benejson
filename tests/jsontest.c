@@ -9,7 +9,7 @@
 static unsigned s_last_keylen;
 static unsigned s_last_strlen;
 
-int usercb(const bnj_state* state, const uint8_t* buff){
+int usercb(const bnj_state* state, bnj_ctx* ctx, const uint8_t* buff){
 	static char buffer[1024];
 	unsigned st = state->stack[state->depth - state->depth_change];
 	printf("Call depth : %d,%d,%x;", state->depth, state->depth_change, state->stack[state->depth]);
@@ -29,7 +29,7 @@ int usercb(const bnj_state* state, const uint8_t* buff){
 				bnj_stpkeycpy(buffer, state->v + i, buff);
 				printf("  Key %s;", buffer);
 
-				if(state->user_ctx->key_set){
+				if(ctx->key_set){
 					printf("Key enum %d;", state->v[i].key_enum);
 				}
 			}
@@ -89,6 +89,7 @@ int main(int argc, const char* argv[]){
 	bnj_state mstate;
 	bnj_ctx ctx = {
 		.user_cb = usercb,
+		.user_data = NULL,
 		.key_set = keys,
 		.key_set_length = 8,
 	};
@@ -101,8 +102,6 @@ int main(int argc, const char* argv[]){
 	bnj_state_init(&mstate, stackbuff, 128);
 	mstate.v = values;
 	mstate.vlen = 16;
-
-	mstate.user_ctx = &ctx;
 
 	char* endptr;
 	unsigned buffsize = strtol(argv[1], &endptr, 10);
@@ -120,7 +119,7 @@ int main(int argc, const char* argv[]){
 		if(ret < 0)
 			return 1;
 
-		const uint8_t* res = bnj_parse(&mstate, buff, ret);
+		const uint8_t* res = bnj_parse(&mstate, &ctx, buff, ret);
 		printf("Stopped at %lu, char=%c\n", res - buff, *res);
 		if(mstate.flags & BNJ_ERROR_MASK){
 			printf("Error\n");
@@ -129,7 +128,7 @@ int main(int argc, const char* argv[]){
 	}
 
 	if(!(mstate.flags & BNJ_ERROR_MASK))
-		usercb(&mstate, NULL);
+		usercb(&mstate, &ctx, NULL);
 
 	return 0;
 }

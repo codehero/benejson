@@ -151,6 +151,9 @@ namespace BNJ {
 			/** @brief Get Reference to underlying C spj state. */
 			const bnj_state& c_state(void) const;
 
+			/** @brief Get Reference to underlying C user state. */
+			const bnj_ctx& c_ctx(void) const;
+
 			/** @brief Get pull parser depth.
 			 *  @return Current depth in JSON data. */
 			unsigned Depth(void) const;
@@ -283,6 +286,10 @@ inline bool BNJ::PullParser::Descended(void) const{
 
 inline const bnj_state& BNJ::PullParser::c_state(void) const{
 	return _pstate;
+}
+
+inline const bnj_ctx& BNJ::PullParser::c_ctx(void) const{
+	return _ctx;
 }
 
 inline unsigned BNJ::PullParser::Depth(void) const{
