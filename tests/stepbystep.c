@@ -45,9 +45,9 @@ int main(int argc, const char* argv[]){
 			const uint8_t* res = bnj_parse(&mstate, &ctx, cur, 1);
 			/* Print out state */
 			printf("{\"b\":\"0x%02x\", \"dc\":%3i, \"vi\":%3u, \"d\":%4u, \"dig\":%2u, "
-				"\"f\":\"0x%08x\", \"doff\":%2d, \"sv\":%20u, "
+				"\"f\":\"0x%08x\", \"doff\":%2d, \"sv\":%20lu, "
 				"\"se\":%6u, \"st\":\"0x%02x\", \"kl\":%3u,"
-				"\"dv\":\"0x%08x\",\"c\":%u},\n",
+				"\"dv\":\"0x%08x\",\"c\":%lu},\n",
 				*cur, mstate.depth_change, mstate.vi, mstate.depth, mstate.digit_count,
 				mstate.flags, mstate._decimal_offset, mstate._paf_significand_val,
 				mstate._paf_exp_val, mstate._paf_type, mstate._key_len,

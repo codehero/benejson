@@ -110,7 +110,7 @@ int main(int argc, const char* argv[]){
 
 		const uint8_t* res = bnj_parse(&mstate, &ctx, buff, ret);
 		if(mstate.flags & BNJ_ERROR_MASK){
-			printf("Error\n");
+			printf("Error at %s\n", res);
 			return 1;
 		}
 

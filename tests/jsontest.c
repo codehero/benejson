@@ -1,4 +1,5 @@
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -38,7 +39,7 @@ int usercb(const bnj_state* state, bnj_ctx* ctx, const uint8_t* buff){
 			if(!(state->v[i].type & BNJ_VFLAG_KEY_FRAGMENT)){
 				switch(state->v[i].type & BNJ_TYPE_MASK){
 					case BNJ_STRING:
-						bnj_stpcpy8(buffer, state->v + i, buff);
+						bnj_stpcpy8((unsigned char*)buffer, state->v + i, buff);
 						printf("Val %s;", buffer);
 						break;
 

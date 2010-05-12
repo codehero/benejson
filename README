@@ -9,9 +9,9 @@ Abstract:
 	fast, minimal and easy to integrate directly into source.
 
 Current release information:
-	Date: January 31, 2010
-	Version: 0.8.0
-	Type: Alpha, User Interface Release Candidate
+	Date: May 12, 2010
+	Version: 0.9.0
+	Type: Beta, Bug Fixing Final Release Candidate
 
 Current version dependencies:
   -Usable <stdint.h>
@@ -27,11 +27,8 @@ Use cases:
 	 -Memory constrained embedded systems
 	 -Web services handling JSON input
 	 -Configuration file reading
-	-One by one pull parsing
-	-Basis for scripting language bindings.
-
-	-The author will not provide functions for DOM-like tree generation,
-	 though users are certainly welcome to write their own.
+	-One by one pull parsing (aka generator)
+	-Wrap around C callback interface for implementing scripting language binding
 
 Goals:
   -Full verification of JSON spec
@@ -49,6 +46,7 @@ Goals:
 	 -ZERO use of global variables, including malloc calls
 	 -Zero memory leaks by design
 	 -Inhibit DoS attacks by limiting depth and avoiding eager evaluations
+	 -Conversion by pull insures that integers can also be interpreted as floats
 	 -User can provide an alphabetically sorted array of character strings
 	  against which the library will match map keys. The library will tag
 		each value with the index of user's array, thus speeding up value
@@ -68,21 +66,71 @@ Future Goals (after 1.0.0):
 	 -Pretty formatting
 	 -Compact formatting
 	 -Aligned string formatting
-	-Create patches to C core for parsing arbitrary precision numbers
+	-Patches to C core for parsing arbitrary precision numbers
+	-Output functionality
+	-C++ interface over callback functionality (simplify callback usage)
+
+MOTIVATION
+
+Why not use an existing callback library:
+	Callback based libraries (cjson, yajl) typically require the user to define callback functions based on TYPE.
+	-This is a poor approach because the parser is forced to eagerly interpret values before giving them to the user.
+	-Thus, if the user wants to read a float, but the parser reads '1', then the parser calls the integer callback! yajl kludges around this by providing uet another callback.
+	-Interpreting data is always based on SCOPE, so organizing callbacks by TYPE is incongruous.
+	-These libraries waste cycles dynamically allocating memory to make large strings contiguous and in UTF-8 format.
+	-Some users may want UTF-16 or UTF-32 strings. These libraries only deliver UTF-8 string.
+	-Some libraries refuse to support NaN or +/- Infinity values. Although against the spec, I personally have a Real Demand for these.
+
+Why use BeneJSON for callbacks:
+	BeneJSON only requires the user to define a single callback. The callback provides the user with two sets of information:
+	-Change in JSON context (up/down the stack, array or map).
+	-How many data read.
+	-BeneJSON will classify each datum as a String, Numeric, or Special (true, false, null) or optionally (NaN, +/- Infinity).
+	-The user can call helper functions to convert the element to the desired type (float, int, UTF-8 string, etc).
+	-There are some restrictions on conversion (ie, no conversion from Numeric to UTF-8 and vice versa).
+	-BeneJSON records the length of string fragments and reports how many bytes the fragment would require in UTF-8,UTF-16, and UTF-32.
+	-BeneJSON does not use a single piece of global state, especially not malloc(). There is no possibility of a memory leak.
+
+Why not use BeneJSON for callbacks:
+	-BeneJSON forces the user to do their own string allocation. This is both a good and a bad thing.
+	 -It is good because simple pieces of information like names, email addresses, etc are generally bounded to reasonably small values.
+	  -The PullParser interface lets the user read into stack allocated strings, with no fear overflow.
+	 -It is bad because the user may be expecting a large string (such as an email) which BeneJSON would be forced to deliver in chunks.
+	  -Much like one would read a file in chunks, the same strategy may be employed with BeneJSON and large strings.
+	  -The user may also opt to use a buffer size exceeding the largest allowable input, which negates this bad aspect.
+	-The C callback interface itself may seem hairy to use.
+	 -There is a C++ Pull Parser interface which can aid in binding development.
+	 -Somewhere down the road I will implement an easier C++ interface.
+
+Why not use an existing tree building library:
+	Tree building libraries are convenient, but have many drawbacks:
+	-Undesirable for large inputs, as the entirety of the input must be parsed before the user sees the first glimpse of data.
+	-They may also not build the tree in a desired format.
+	-They are typically built on some kind of lower level parsing library anyway.
+	-Unless you are working directly in javascript, it is impossible to deliver a Tree class with general appeal.
+
+	The user may use BeneJSON to build their own custom tree. Maybe one day I will write my own..
+
+Why use the PullParser Interface:
+  The PullParser interface is higher level C++ class designed to make parsing code resemble more closely the schema defining the data.
+	-The user "pulls" data from the JSON file piece by piece, rather than trying to catch it in a callback
+	-Many of the fragmentation issues disappear behind the PullParser class.
+	-Reading large strings is akin to reading file data (chunk by chunk)
+	-For those of you who like exceptions, you will like the Pull Parser as each "pull" carries with it an expectation of type. Error catching is very smooth.
+	-For those of you who despise exceptions, feel free to remove them from the source code.
 
 NOTES
 
-Version 0.8.0 Known Bugs/TODO:
+Version 0.9.0 Known Bugs/TODO:
 
-1) UTF-8 is not yet fully verified in strings
-2) UTF-16 not properly handled if fragmented
-3) pull.hh:Consume() is not handled for fragmenting cases yet
-4) Key enum mappings do not yet work with unescaped chars, UTF-8 mapping
-5) No support for wide char key enums
-6) Complete regression and verification programs
-7) Add more test cases for said regression/verification
-8) PullParser::FileOffset not implemented
-9) Error reporting in PullParser is incomplete
+1) BeneJSON currently does not translate escape characters in keys to UTF-8.
+As an example, BeneJSON would interpret {"key\n":0} as a key with 4 characters; it would NOT convert '\n' to a single char.
+Obviously this is broken behaviour according the JSON spec, but I will only fix it if somebody really needs it...
+2) Similarly, BeneJSON only optimizes its key search for strings in UTF-8.
+UTF-16/32 strings should be converted to UTF-8 and lexicographically sorted to use this functionality.
+3) Incomplete regression and verification programs
+4) Add more test cases for said regression/verification
+5) BeneJSON is employed in the real world and performs well.
 
 Copyright (c) 2010 David Bender assigned to Benegon Enterprises LLC
 See the file LICENSE for full license information.

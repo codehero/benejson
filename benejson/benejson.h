@@ -1,5 +1,8 @@
 /* Copyright (c) 2010 David Bender assigned to Benegon Enterprises LLC
- * See the file LICENSE for full license information. */
+ * See the file LICENSE for full license information.
+ *
+ * Version 0.9.0, May 12 2010
+ * */
 
 #ifndef __BENEGON_BNJ_H__
 #define __BENEGON_BNJ_H__
@@ -319,19 +322,19 @@ typedef struct bnj_state_s{
 	uint32_t _cp_fragment;
 
 	/** @brief Supremum of key set tracking. */
-	uint16_t _key_set_sup;
+	uint32_t _key_set_sup;
 
 	/** @brief Internal key length counter. */
-	uint16_t _key_len;
+	uint32_t _key_len;
 
 	/** @brief PAF key enum */
-	uint16_t _paf_key_enum;
+	uint32_t _paf_key_enum;
 
 	/** @brief PAF type */
-	uint16_t _paf_type;
+	uint32_t _paf_type;
 
 	/** @brief PAF exp_val */
-	int16_t _paf_exp_val;
+	int32_t _paf_exp_val;
 
 	/** @brief PAF significand value. */
 	SIGNIFICAND _paf_significand_val;

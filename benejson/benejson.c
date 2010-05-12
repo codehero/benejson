@@ -126,7 +126,7 @@ static inline void s_reset_state(bnj_state* state){
 static inline void s_match_key(bnj_state* state, bnj_ctx* ctx, uint8_t target){
 	const char* const *const key_set = ctx->key_set;
 	uint16_t* key_enum = &(state->v[state->vi].key_enum);
-	const uint16_t* key_length = &(state->_key_len);
+	const uint32_t* key_length = &(state->_key_len);
 	/* Adjust minimum if necessary. */
 	if(target !=
 			key_set[*key_enum][*key_length])
@@ -596,6 +596,10 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 					/* Assume end of integer. Modify exponent with decimal point. */
 					if(-1 != state->_decimal_offset)
 						curval->exp_val = -(state->digit_count - state->_decimal_offset);
+
+					/* Clear PAF significand and exp_val since final value settled. */
+					state->_paf_exp_val = 0;
+					state->_paf_significand_val = 0;
 					SETSTATE(state->flags,  BNJ_END_VALUE);
 				}
 				break;
@@ -638,6 +642,9 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 				/* Assume end of exponent. Sign adjustment. */
 				if(curval->type & BNJ_VFLAG_NEGATIVE_EXPONENT)
 					curval->exp_val = -curval->exp_val;
+
+				/* Clear PAF exp_val since final value settled. */
+				state->_paf_exp_val = 0;
 
 				/* Modify exponent with decimal point. */
 				if(-1 == state->_decimal_offset)
@@ -804,6 +811,10 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 							state->stack[state->depth] &= ~BNJ_KEY_INCOMPLETE;
 							if(state->_key_set_sup == curval->key_enum)
 								curval->key_enum = uctx->key_set_length;
+
+							/* Reset PAF values since the current just got set. */
+							state->_paf_type = 0;
+							state->_paf_key_enum = 0;
 
 							/* Preemptive reset. */
 							state->_key_len = 0;
@@ -1041,6 +1052,9 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 
 			case BNJ_END_VALUE:
 				{
+					/* Should NEVER encounter key fragment here. */
+					assert(!(state->v[state->vi].type & BNJ_VFLAG_KEY_FRAGMENT));;
+
 					/* Clear fragment and incomplete status. */
 					state->v[state->vi].type &= ~BNJ_VFLAG_VAL_FRAGMENT;
 					state->stack[state->depth] &= ~BNJ_VAL_INCOMPLETE;
@@ -1103,6 +1117,9 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 		}
 		/* end while */
 	}
+
+	/* The only way to reach the end of the while loop is to run out of
+	 * chars in the buffer! */
 
 	/* Ensure user sees fragment. */
 	if(bnj_incomplete(state, curval)){

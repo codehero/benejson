@@ -338,7 +338,7 @@ int parse_rules(rules_parse_state* rps, bnj_state* st, int inputfd){
 
 		const uint8_t* res = bnj_parse(st, &ctx, buff, ret);
 		if(st->flags & BNJ_ERROR_MASK){
-			printf("Error\n");
+			printf("Error %s\n", res);
 			return 1;
 		}
 	}

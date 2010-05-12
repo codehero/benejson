@@ -1,5 +1,8 @@
 /* Copyright (c) 2010 David Bender assigned to Benegon Enterprises LLC
- * See the file LICENSE for full license information. */
+ * See the file LICENSE for full license information.
+ * 
+ * Version 0.9.0, May 12 2010
+ * */
 
 #ifndef __BENEGON_JSON_PULL_PARSER_HH__
 #define __BENEGON_JSON_PULL_PARSER_HH__
@@ -68,11 +71,13 @@ namespace BNJ {
 
 			/** @brief Exception type thrown by PullParser and company.
 			 * Not used for errors thrown for failures from Reader::Read(). */
-			class input_error : public virtual std::runtime_error {
+			class input_error : public virtual std::exception{
 				public:
-					input_error(const char* msg, unsigned offset);
+					input_error(const char* msg, unsigned file_offset);
+					const char* what(void) const throw();
 
-					const unsigned file_offset;
+				private:
+					char _msg[128];
 			};
 
 
@@ -219,8 +224,11 @@ namespace BNJ {
 			/** @brief Current depth. */
 			unsigned _depth;
 
-			/** @brief How many bytes have been pull parsed. */
-			unsigned _pull_parsed;
+			/** @brief Count of bytes parsed by bnj_parse(). */
+			unsigned _total_parsed;
+
+			/** @brief Count of bytes successfully Pulled(). */
+			unsigned _total_pulled;
 
 			/** @brief How many UTF-8 bytes remaining. */
 			unsigned _utf8_remaining;
@@ -270,9 +278,13 @@ namespace BNJ {
 
 /* Inlines */
 
+inline const char* BNJ::PullParser::input_error::what(void) const throw(){
+	return _msg;
+}
+
 inline const bnj_val& BNJ::PullParser::GetValue(void) const{
 	if(_val_idx >= _val_len)
-		throw std::runtime_error("No valid parser value!");
+		throw input_error("No valid parser value!", _total_pulled);
 	return _valbuff[_val_idx];
 }
 

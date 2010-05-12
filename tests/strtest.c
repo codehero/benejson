@@ -435,8 +435,6 @@ int main(int argc, const char* argv[]){
 	/* Good test. */
 	const char cp_str[] =
 		"Good Test %u, Mismatched cp%u count expected %u, got %u\n";
-	const char cp_frag_str[] =
-		"Good Frag Test %u, Mismatched cp%u count expected %u, got %u\n";
 	succeeded = 0;
 	failed = 0;
 	for(i = 0; i < good_length; ++i){
@@ -470,7 +468,7 @@ int main(int argc, const char* argv[]){
 	failed = 0;
 	for(i = 0; i < good_length; ++i){
 		unsigned maxlen = strlen(s_good[i].json);
-		unsigned expect = strlen(s_good[i].utf8);
+		unsigned expect = strlen((const char*)s_good[i].utf8);
 		bnj_state_init(&mstate, stackbuff, 128);
 		mstate.v = values;
 		mstate.vlen = 16;

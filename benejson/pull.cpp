@@ -1,8 +1,6 @@
 /* Copyright (c) 2010 David Bender assigned to Benegon Enterprises LLC
  * See the file LICENSE for full license information. */
 
-#include <cstring>
-#include <cstdio>
 #include <climits>
 #include <assert.h>
 #include "pull.hh"
@@ -72,9 +70,30 @@ static void s_throw_type_error(const BNJ::PullParser& p, unsigned type){
 BNJ::PullParser::Reader::~Reader() throw(){
 }
 
-BNJ::PullParser::input_error::input_error(const char* msg, unsigned offset) :
-	std::runtime_error(msg), file_offset(offset)
+BNJ::PullParser::input_error::input_error(const char* blurb,
+	unsigned file_offset)
 {
+	char* x = stpcpy(_msg, "@");
+
+	/* Write 0-padded 9-digit number. */
+	char* y = x + 9;
+	while(file_offset && y != x){
+		*y = '0' + (file_offset % 10);
+		file_offset /= 10;
+		--y;
+	}
+	while(y != x){
+		*y = '0';
+		--y;
+	}
+
+	x += 10;
+	*x = ':';
+	++x;
+
+	/* Copy as many bytes of blurb as possible. */
+	x = stpncpy(x, blurb, 127 - (x - _msg));
+	*x = '\0';
 }
 
 /* Only initialize the read state here to NULL values. */
@@ -97,11 +116,11 @@ unsigned BNJ::PullParser::ChunkRead8(char* dest, unsigned destlen,
 	unsigned key_enum)
 {
 	if(_val_idx >= _val_len)
-		throw std::runtime_error("No valid parser value!");
+		throw input_error("No chunk string data!", _total_pulled);
 
 	/* out will always point to first empty char. */
 	uint8_t* out = (uint8_t*)dest;
-	unsigned remaining = destlen;
+	unsigned out_remaining = destlen;
 	bnj_val& val = _valbuff[_val_idx];
 
 	/* Verify enum and type. */
@@ -110,7 +129,7 @@ unsigned BNJ::PullParser::ChunkRead8(char* dest, unsigned destlen,
 	if(bnj_val_type(&val) != BNJ_STRING)
 		s_throw_type_error(*this, BNJ_STRING);
 
-	while(remaining > _utf8_remaining || !dest){
+	while(out_remaining > _utf8_remaining || !dest){
 		bnj_val& val = _valbuff[_val_idx];
 		bool completed = !bnj_incomplete(&_pstate, &val);
 
@@ -123,8 +142,8 @@ unsigned BNJ::PullParser::ChunkRead8(char* dest, unsigned destlen,
 		if(completed)
 			return out - (uint8_t*)dest;
 
-		/* Decrement remaining bytes, but add back in null terminator. */
-		remaining = destlen - (out - (uint8_t*)dest) + 1;
+		/* Decrement out_remaining bytes, but add back in null terminator. */
+		out_remaining = destlen - (out - (uint8_t*)dest) + 1;
 
 		/* Just finished reading data from fragment, so must be at end
 		 * of unparsed data. Refill the entire buffer. */
@@ -138,15 +157,15 @@ unsigned BNJ::PullParser::ChunkRead8(char* dest, unsigned destlen,
 	}
 
 	/* Save room for null terminator. */
-	--remaining;
+	--out_remaining;
 
 	/* Copy fragmented char if applicable. */
 	if(val.significand_val != BNJ_EMPTY_CP){
-		out =
-			bnj_utf8_char((uint8_t*)dest, remaining, (uint32_t)val.significand_val);
+		out = bnj_utf8_char((uint8_t*)dest, out_remaining,
+			(uint32_t)val.significand_val);
 		if((uint8_t*)dest != out){
 			unsigned written = out - (uint8_t*)dest;
-			remaining -= written;
+			out_remaining -= written;
 			_utf8_remaining -= written;
 		}
 		else{
@@ -158,7 +177,7 @@ unsigned BNJ::PullParser::ChunkRead8(char* dest, unsigned destlen,
 	/* Only copy up to minimum of len and content length. */
 	const uint8_t* x = Buff() + val.strval_offset;
 	const uint8_t* b = x;
-	uint8_t* res = bnj_json2utf8(out, remaining, &b);
+	uint8_t* res = bnj_json2utf8(out, out_remaining, &b);
 
 	/* Update bytes remaining in the input buffer. */
 	_offset += b - x;
@@ -172,7 +191,8 @@ void BNJ::PullParser::Begin(uint8_t* buffer, unsigned len, Reader* reader) throw
 	_buffer = buffer;
 	_len = len;
 	_reader = reader;
-	_pull_parsed = 0;
+	_total_parsed = 0;
+	_total_pulled = 0;
 
 	/* Reset state. */
 	_depth = 0;
@@ -189,7 +209,8 @@ void BNJ::PullParser::Begin(uint8_t* buffer, unsigned len, Reader* reader) throw
 }
 
 unsigned BNJ::PullParser::FileOffset(const bnj_val& v) const throw(){
-	return 0;
+	/* FIXME! */
+	return _total_pulled + v.strval_offset;
 }
 
 /* NOTE the approach here (reading phase, parsing phase) is the not most
@@ -230,15 +251,17 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 		switch(_state){
 			case PARSE_ST:
 				{
-					/* Parser is at end state when depth is 0 not at begin state. */
+					/* Parser is at end state when depth is 0 AND not at begin state. */
 					if(!_depth && _parser_state != ST_BEGIN){
 						_parser_state = ST_NO_DATA;
 						return _parser_state;
 					}
 
 					/* If no more bytes to parse, then go to read state. */
-					if(_first_empty == _first_unparsed)
+					if(_first_empty == _first_unparsed){
+						/* Completely read all the bytes in the buffer. */
 						FillBuffer(_len);
+					}
 
 					/* Assign output values. */
 					_pstate.v = _valbuff;
@@ -247,13 +270,16 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 					_val_len = 0;
 
 					/* Set offset to where parsing begins. Parse data.
-					 * Advance first unparsed to where parsing ended. */
+					 * Update parsed counter. */
+					_total_pulled = _total_parsed;
 					const uint8_t* res = bnj_parse(&_pstate, &_ctx,
 						_buffer + _first_unparsed, _first_empty - _first_unparsed);
+					_total_parsed += res - (_buffer + _first_unparsed);
 
 					/* Abort on error. */
 					if(_pstate.flags & BNJ_ERROR_MASK)
-						throw input_error(s_error_msgs[_pstate.flags - BNJ_ERROR_MASK], 0);
+						throw input_error(s_error_msgs[_pstate.flags - BNJ_ERROR_MASK],
+							_total_parsed);
 
 					if(!frag_key_len){
 						_offset = _first_unparsed;
@@ -264,7 +290,7 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 						_pstate.v->key_length += frag_key_len;
 
 						/* Bias any other values read in.
-						 * Start point is moves away from offset. */
+						 * Start point moves away from offset. */
 						for(unsigned i = 0; i <= _pstate.vi; ++i){
 							_pstate.v[i].key_offset += frag_key_len;
 							_pstate.v[i].strval_offset += frag_key_len;
@@ -274,6 +300,8 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 						frag_key_len = 0;
 						_offset = 0;
 					}
+
+					/* Advance first unparsed to where parsing ended. */
 					_first_unparsed = res - _buffer;
 
 					/* If read any semblance of values, then switch to value state. */
@@ -328,7 +356,7 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 							return ST_DATUM;
 						}
 
-						/* Move fragment from near buffer end * to buffer start
+						/* Move fragment from near buffer end to buffer start
 						 * so FillBuffer() appends to fragment.
 						 * Note only string value fragments are 'large' fragments.
 						 * Since string fragments are filtered out at this point, the
@@ -404,7 +432,7 @@ unsigned BNJ::GetKey(char* dest, unsigned destlen, const PullParser& p){
 	const bnj_val& val = p.GetValue();
 	if(dest){
 		if(val.key_length > destlen)
-			throw std::runtime_error("First key value overlong!");
+			throw PullParser::input_error("Key value overlong!", p.FileOffset(val));
 		return bnj_stpkeycpy(dest, &val, p.Buff()) - dest;
 	}
 	return 0;
@@ -435,10 +463,10 @@ void BNJ::Get(int& ret, const PullParser& p, unsigned key_enum){
 		s_throw_type_error(p, BNJ_NUMERIC);
 
 	if(val.exp_val)
-		throw std::runtime_error("Non-integral numeric value!");
+		throw PullParser::input_error("Non-integral numeric value!", p.FileOffset(val));
 
 	if(val.significand_val > LONG_MAX)
-		throw std::runtime_error("Out of range integer!");
+		throw PullParser::input_error("Out of range integer!", p.FileOffset(val));
 
 	ret = val.significand_val;
 	if(val.type & BNJ_VFLAG_NEGATIVE_SIGNIFICAND)
@@ -522,7 +550,7 @@ void BNJ::VerifyList(const PullParser& p, unsigned key_enum){
 			s_throw_key_error(p, key_enum);
 	}
 	if(p.GetState() != PullParser::ST_LIST)
-		throw std::runtime_error("Value is not list!");
+		throw PullParser::input_error("Expected List!", p.FileOffset(p.GetValue()));
 }
 
 void BNJ::VerifyMap(const PullParser& p, unsigned key_enum){
@@ -532,5 +560,5 @@ void BNJ::VerifyMap(const PullParser& p, unsigned key_enum){
 			s_throw_key_error(p, key_enum);
 	}
 	if(p.GetState() != PullParser::ST_MAP)
-		throw std::runtime_error("Value is not map!");
+		throw PullParser::input_error("Expected Map!", p.FileOffset(p.GetValue()));
 }
