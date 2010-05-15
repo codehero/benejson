@@ -422,6 +422,14 @@ unsigned bnj_strlen32(const bnj_val* src);
  *  @return pointer to dst's null terminator. NULL if there is no key. */
 char* bnj_stpkeycpy(char* dst, const bnj_val* src, const uint8_t* buff);
 
+/** @brief Copy key to destination buffer.
+ *  @param dst Where to copy data. Must hold at least src->string_val + 1 chars.
+ *  @param dstlen Length of destination buffer.
+ *  @param src BNJ value containing BNJ_STRING string data.
+ *  @param buff buffer containing string data.
+ *  @return pointer to dst's null terminator. NULL if there is no key. */
+char* bnj_stpnkeycpy(char* dst, unsigned dstlen, const bnj_val* src, const uint8_t* buff);
+
 /** @brief Copy JSON encoded string to normal UTF-8 destination.
  *  @param dst Where to copy data. Must hold at least src->string_val + 1 chars.
  *  @param src BNJ value containing BNJ_STRING string data.
@@ -525,6 +533,19 @@ inline char* bnj_stpkeycpy(char* dst, const bnj_val* src, const uint8_t* buff){
 		memcpy(dst, buff + src->key_offset, src->key_length);
 		dst[src->key_length] = '\0';
 		return dst + src->key_length;
+	}
+	return NULL;
+}
+
+inline char* bnj_stpnkeycpy(char* dst, unsigned dstlen, const bnj_val* src,
+	const uint8_t* buff)
+{
+	if(src->key_length){
+		unsigned copylen =
+			(dstlen < (unsigned)(src->key_length + 1)) ? (dstlen - 1) : src->key_length;
+		memcpy(dst, buff + src->key_offset, copylen);
+		dst[copylen] = '\0';
+		return dst + copylen;
 	}
 	return NULL;
 }
