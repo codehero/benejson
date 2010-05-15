@@ -69,7 +69,7 @@ namespace BNJ {
 					virtual int Read(uint8_t* buff, unsigned len) throw() = 0;
 			};
 
-			/** @brief Exception type thrown by PullParser and company.
+			/** @brief Exception type for syntax errors.
 			 * Not used for errors thrown for failures from Reader::Read(). */
 			class input_error : public virtual std::exception{
 				public:
@@ -78,6 +78,21 @@ namespace BNJ {
 
 				private:
 					char _msg[128];
+
+					friend class PullParser;
+			};
+
+			/** @brief Exception type thrown by user; Provided for convenience.
+			 * Use when value is correct JSON, but not expected during parsing. */
+			class invalid_value : public virtual std::exception{
+				public:
+					/** @brief  */
+					invalid_value(const char* msg, const PullParser& parser);
+					const char* what(void) const throw();
+
+				private:
+					/** @brief Internal message buffer. */
+					char _msg[256];
 			};
 
 
@@ -279,6 +294,10 @@ namespace BNJ {
 /* Inlines */
 
 inline const char* BNJ::PullParser::input_error::what(void) const throw(){
+	return _msg;
+}
+
+inline const char* BNJ::PullParser::invalid_value::what(void) const throw(){
 	return _msg;
 }
 

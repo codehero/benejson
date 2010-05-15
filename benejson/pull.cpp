@@ -67,32 +67,52 @@ static void s_throw_type_error(const BNJ::PullParser& p, unsigned type){
 	throw BNJ::PullParser::input_error(buffer, p.FileOffset(val));
 }
 
+static char* s_compose_9(char* out, unsigned number){
+	/* Write 0-padded 9-digit number. */
+	*out = '@';
+	for(char* y = out + 9; y != out; --y){
+		*y = '0' + (number % 10);
+		number /= 10;
+	}
+
+	out += 10;
+	*out = ':';
+	++out;
+
+	return out;
+}
+
 BNJ::PullParser::Reader::~Reader() throw(){
 }
 
 BNJ::PullParser::input_error::input_error(const char* blurb,
 	unsigned file_offset)
 {
-	char* x = stpcpy(_msg, "@");
-
-	/* Write 0-padded 9-digit number. */
-	char* y = x + 9;
-	while(file_offset && y != x){
-		*y = '0' + (file_offset % 10);
-		file_offset /= 10;
-		--y;
-	}
-	while(y != x){
-		*y = '0';
-		--y;
-	}
-
-	x += 10;
-	*x = ':';
-	++x;
+	char* x = s_compose_9(_msg, file_offset);
 
 	/* Copy as many bytes of blurb as possible. */
 	x = stpncpy(x, blurb, 127 - (x - _msg));
+	*x = '\0';
+}
+
+BNJ::PullParser::invalid_value::invalid_value(const char* blurb,
+	const PullParser& p)
+{
+	const bnj_val& val = p.GetValue();
+
+	/* Reserve 1 char in buff for '\0', and 1 for ' ' */
+	char* x = s_compose_9(_msg, p.FileOffset(val));
+
+	/* Copy key value if necessary. */
+	if(val.key_length){
+		x = stpcpy(x, "Key: ");
+		x = bnj_stpnkeycpy(x, 254 - (x - _msg), &val, p.Buff());
+		*x = ' ';
+		++x;
+	}
+
+	/* Copy as many bytes of blurb as possible. */
+	x = stpncpy(x, blurb, 254 - (x - _msg));
 	*x = '\0';
 }
 
@@ -446,11 +466,11 @@ void BNJ::Get(unsigned& u, const PullParser& p, unsigned key_enum){
 		s_throw_type_error(p, BNJ_NUMERIC);
 
 	if(val.exp_val)
-		throw std::runtime_error("Non-integral numeric value!");
+		throw PullParser::invalid_value("Non-integral numeric value!", p);
 
 	/* Check sign. */
 	if(val.type & BNJ_VFLAG_NEGATIVE_SIGNIFICAND)
-		throw std::runtime_error("Must be nonnegative!");
+		throw PullParser::invalid_value("Must be nonnegative!", p);
 
 	u = val.significand_val;
 }
