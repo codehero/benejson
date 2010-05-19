@@ -192,6 +192,9 @@ enum {
 	/** @brief Invalid or unexpected UTF-8 character. */
 	BNJ_ERR_UTF_8,
 
+	/** @brief Overlong UTF-8 encoding. */
+	BNJ_ERR_UTF_8_OVERLONG,
+
 	/** @brief UTF-16 surrogate error. */
 	BNJ_ERR_UTF_SURROGATE,
 

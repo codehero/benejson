@@ -439,9 +439,8 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 						curval->key_length = 0;
 						state->_key_len = 0;
 					}
-					else{
-						curval->type = 0;
-					}
+					curval->type = 0;
+					state->_paf_type = 0;
 
 					/* Comma is OK to see at old depth. */
 					if(state->depth - 1)
@@ -661,7 +660,7 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 						SETSTATE(state->flags, BNJ_ERR_INVALID);
 						return i;
 					}
-					else if(*i & 0x80 && !(curval->type & BNJ_VFLAG_KEY_FRAGMENT)){
+					else if(*i & 0x80){
 						/* Process first byte. */
 						state->_cp_fragment = *i;
 						if((*i & 0xF8) == 0xF0){
@@ -747,7 +746,7 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 							/* 4 byte encoding. */
 							case 0x7:
 								if((state->_cp_fragment & 0xFFFFFF) < 0x10000){
-									SETSTATE(state->flags, BNJ_ERR_UTF_8);
+									SETSTATE(state->flags, BNJ_ERR_UTF_8_OVERLONG);
 									return i;
 								}
 								break;
@@ -755,13 +754,17 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 							/* 3 byte encoding. */
 							case 0x6:
 								if((state->_cp_fragment & 0xFFFFFF) < 0x800){
-									SETSTATE(state->flags, BNJ_ERR_UTF_8);
+									SETSTATE(state->flags, BNJ_ERR_UTF_8_OVERLONG);
 									return i;
 								}
 								break;
 
 							/* 2 byte encoding. Nothing to do. */
 							case 0x4:
+								if((state->_cp_fragment & 0xFFFFFF) < 0x80){
+									SETSTATE(state->flags, BNJ_ERR_UTF_8_OVERLONG);
+									return i;
+								}
 								break;
 
 								/* No other values should appear. */
@@ -773,7 +776,7 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 						if(state->_cp_fragment >= 0xD800 && state->_cp_fragment <= 0xDFFF){
 							/* MAYBE, should I really reject this? a wstrcpy function
 							 * could just convert this to the appropriate character value. */
-							SETSTATE(state->flags, BNJ_ERR_UTF_8);
+							SETSTATE(state->flags, BNJ_ERR_UTF_SURROGATE);
 							return i;
 						}
 
@@ -812,15 +815,16 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 							if(state->_key_set_sup == curval->key_enum)
 								curval->key_enum = uctx->key_set_length;
 
-							/* Reset PAF values since the current just got set. */
-							state->_paf_type = 0;
-							state->_paf_key_enum = 0;
-
 							/* Preemptive reset. */
 							state->_key_len = 0;
 						}
+
+						/* Reset PAF values since the current just got set. */
+						state->_paf_type = 0;
+						state->_paf_key_enum = 0;
+
 					}
-					else if(*i == '\\' && !(curval->type & BNJ_VFLAG_KEY_FRAGMENT)){
+					else if(*i == '\\'){
 						/* Escape sequence, initialize fragment to 0. */
 						state->_cp_fragment = 0;
 						++i;

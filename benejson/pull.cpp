@@ -34,6 +34,7 @@ static const char* s_error_msgs[BNJ_ERROR_COUNT] = {
 	"List/map mismatch",
 	"Missing colon",
 	"Invalid UTF-8 char",
+	"Overlong UTF-8 encoding",
 	"Invalid UTF-16 surrogate encoding"
 };
 
