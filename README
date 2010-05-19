@@ -9,8 +9,8 @@ Abstract:
 	fast, minimal and easy to integrate directly into source.
 
 Current release information:
-	Date: May 15, 2010
-	Version: 0.9.1
+	Date: May 19, 2010
+	Version: 0.9.2
 	Type: Beta, Bug Fixing Final Release Candidate
 
 Current version dependencies:
@@ -121,16 +121,15 @@ Why use the PullParser Interface:
 
 NOTES
 
-Version 0.9.1 Known Bugs/TODO:
+Version 0.9.2 Known Bugs/TODO:
 
 1) BeneJSON currently does not translate escape characters in keys to UTF-8.
 As an example, BeneJSON would interpret {"key\n":0} as a key with 4 characters; it would NOT convert '\n' to a single char.
 Obviously this is broken behaviour according the JSON spec, but I will only fix it if somebody really needs it...
 2) Similarly, BeneJSON only optimizes its key search for strings in UTF-8.
 UTF-16/32 strings should be converted to UTF-8 and lexicographically sorted to use this functionality.
-3) Incomplete regression and verification programs
-4) Add more test cases for said regression/verification
-5) BeneJSON is employed in the real world and performs well.
+3) jsonoise generates a limited subset of strings (only UTF-8, no escapes)
+4) jsonoise should also generate JSON with a single error
 
 Copyright (c) 2010 David Bender assigned to Benegon Enterprises LLC
 See the file LICENSE for full license information.
