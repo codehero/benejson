@@ -99,22 +99,30 @@ BNJ::PullParser::input_error::input_error(const char* blurb,
 BNJ::PullParser::invalid_value::invalid_value(const char* blurb,
 	const PullParser& p)
 {
-	const bnj_val& val = p.GetValue();
+	if(p.ValidValue()){
+		const bnj_val& val = p.GetValue();
 
-	/* Reserve 1 char in buff for '\0', and 1 for ' ' */
-	char* x = s_compose_9(_msg, p.FileOffset(val));
+		/* Reserve 1 char in buff for '\0', and 1 for ' ' */
+		char* x = s_compose_9(_msg, p.FileOffset(val));
 
-	/* Copy key value if necessary. */
-	if(val.key_length){
-		x = stpcpy(x, "Key: ");
-		x = bnj_stpnkeycpy(x, 254 - (x - _msg), &val, p.Buff());
-		*x = ' ';
-		++x;
+		/* Copy key value if necessary. */
+		if(val.key_length){
+			x = stpcpy(x, "Key: ");
+			x = bnj_stpnkeycpy(x, 254 - (x - _msg), &val, p.Buff());
+			*x = ' ';
+			++x;
+		}
+
+		/* Copy as many bytes of blurb as possible. */
+		x = stpncpy(x, blurb, 254 - (x - _msg));
+		*x = '\0';
 	}
-
-	/* Copy as many bytes of blurb as possible. */
-	x = stpncpy(x, blurb, 254 - (x - _msg));
-	*x = '\0';
+	else {
+		/* FIXME taking a guess here as to the offset. */
+		char* x = s_compose_9(_msg, p.TotalParsed());
+		x = stpncpy(x, blurb, 254 - (x - _msg));
+		*x = '\0';
+	}
 }
 
 /* Only initialize the read state here to NULL values. */

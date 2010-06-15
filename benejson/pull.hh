@@ -156,6 +156,10 @@ namespace BNJ {
 			 *  @throw When parser state is not ST_DATUM */
 			const bnj_val& GetValue(void) const;
 
+			/** @brief Whether there is a value available to GetValue()
+			 *  (descending states do not have valid values available) */
+			bool ValidValue(void) const;
+
 			/** @brief Retrieve current parser state.
 			 * @return After Begin() and before first Pull() call, returns ST_BEGIN.
 			 * Otherwise, identical to return value from Pull() */
@@ -188,6 +192,9 @@ namespace BNJ {
 
 			/** @brief Indicate at what file offset value begins. */
 			unsigned FileOffset(const bnj_val& v) const throw();
+
+			/** @brief Total bytes parsed. */
+			unsigned TotalParsed() const;
 
 		private:
 
@@ -302,9 +309,13 @@ inline const char* BNJ::PullParser::invalid_value::what(void) const throw(){
 }
 
 inline const bnj_val& BNJ::PullParser::GetValue(void) const{
-	if(_val_idx >= _val_len)
+	if(!ValidValue())
 		throw input_error("No valid parser value!", _total_pulled);
 	return _valbuff[_val_idx];
+}
+
+inline bool BNJ::PullParser::ValidValue(void) const{
+	return _val_idx < _val_len;
 }
 
 inline BNJ::PullParser::State BNJ::PullParser::GetState(void) const{
@@ -333,6 +344,10 @@ inline const uint8_t* BNJ::PullParser::Buff(void) const{
 
 inline unsigned BNJ::PullParser::BuffLen(void) const{
 	return _len;
+}
+
+inline unsigned BNJ::PullParser::TotalParsed() const{
+	return _total_parsed;
 }
 
 #endif
