@@ -441,6 +441,7 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 					}
 					curval->type = 0;
 					state->_paf_type = 0;
+					state->_paf_key_enum = 0;
 
 					/* Comma is OK to see at old depth. */
 					if(state->depth - 1)
@@ -1084,6 +1085,7 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 			case BNJ_END_VALUE2:
 					curval->type = 0;
 					state->_paf_type = 0;
+					state->_paf_key_enum = 0;
 
 					/* If depth == 0, then done parsing. */
 					if(0 == state->depth){

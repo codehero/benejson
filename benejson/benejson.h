@@ -531,6 +531,12 @@ inline unsigned bnj_val_type(const bnj_val* src){
 	return src->type & BNJ_TYPE_MASK;
 }
 
+inline unsigned bnj_val_special(const bnj_val* src){
+	if((src->type & BNJ_TYPE_MASK) != BNJ_SPECIAL)
+		return BNJ_COUNT_SPC;
+	return src->significand_val;
+}
+
 inline char* bnj_stpkeycpy(char* dst, const bnj_val* src, const uint8_t* buff){
 	if(src->key_length){
 		memcpy(dst, buff + src->key_offset, src->key_length);
