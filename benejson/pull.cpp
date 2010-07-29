@@ -5,6 +5,32 @@
 #include <assert.h>
 #include "pull.hh"
 
+/* For those of you without stpcpy... */
+static char* bnj_local_stpcpy(char* dest, const char* src){
+	do{
+		*dest = *src;
+		++dest;
+		++src;
+	}while(*src);
+
+	return dest - 1;
+}
+
+
+static char* bnj_local_stpncpy(char* dest, const char* src, size_t count){
+	const char* dend = dest + count;
+	while(dend != dest){
+		*dest = *src;
+		++dest;
+		++src;
+		if(!*src)
+			return dest - 1;
+	}
+
+	return dest;
+}
+
+
 enum {
 	/* Parse remaining date in buffer. */
 	PARSE_ST,
@@ -455,6 +481,10 @@ void BNJ::PullParser::FillBuffer(unsigned end_bound){
 			break;
 		_first_empty += bytes_read;
 	}
+
+	/* If buffer did not fill then error. */
+	if(0 == _first_empty)
+		throw std::runtime_error("PullParser::Pull early EOF.");
 }
 
 unsigned BNJ::GetKey(char* dest, unsigned destlen, const PullParser& p){
