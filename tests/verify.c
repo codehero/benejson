@@ -25,17 +25,19 @@ int main(int argc, const char* argv[]){
 		.key_set_length = 0,
 	};
 
+	/* Assume fragment amount of 1024. */
+	unsigned buffsize;
 	if(argc < 2){
-		fprintf(stderr, "Please specify fragment amount!\n");
-		return 1;
+		buffsize = 1024;
+	}
+	else {
+		char* endptr;
+		buffsize = strtol(argv[1], &endptr, 10);
 	}
 
 	bnj_state_init(&mstate, stackbuff, 128);
 	mstate.v = values;
 	mstate.vlen = 16;
-
-	char* endptr;
-	unsigned buffsize = strtol(argv[1], &endptr, 10);
 
 	unsigned long offset = 0;
 	s_last_strlen = 0;
@@ -53,7 +55,7 @@ int main(int argc, const char* argv[]){
 		const uint8_t* res = bnj_parse(&mstate, &ctx, buff, ret);
 		offset += res - buff;
 		if(mstate.flags & BNJ_ERROR_MASK){
-			printf("Stopped at %lx, char=%hhx, err=%x\n", offset, *res, mstate.flags);
+			printf("Stopped at pos %lu, char=%hhx, err=%x\n", offset, *res, mstate.flags);
 			printf("Error\n");
 			return 1;
 		}
