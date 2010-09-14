@@ -29,11 +29,12 @@ enum {
 	BNJ_EXPECT_COMMA = 0x8
 };
 
+/* Valid whitespace characters are 0x09, 0x0A, 0x0D, 0x20 */
 static const uint8_t s_lookup[256] = {
 	CINV, CINV, CINV, CINV, CINV, CINV, CINV, CINV,
-	CINV|CWHI, CINV|CWHI, CINV|CWHI, CINV|CWHI, CINV|CWHI, CINV, CINV, CINV,
+	CINV, CINV|CWHI, CINV|CWHI, CINV, CINV, CINV|CWHI, CINV, CINV,
 	CINV, CINV, CINV, CINV, CINV, CINV, CINV, CINV,
-	CINV|CWHI, CINV, CINV, CINV, CINV, CINV, CINV, CINV,
+	CINV, CINV, CINV, CINV, CINV, CINV, CINV, CINV,
 	CWHI, 0, CESC, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, CESC,
 	CHEX, CHEX, CHEX, CHEX, CHEX, CHEX, CHEX, CHEX,
@@ -285,6 +286,12 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 					}
 					else if(s_lookup[*i] & CEND){
 						/* FIXME ensure list/map match against the stack! */
+
+						/* Make sure that we do not end clause with incomplete values. */
+						if(state->stack[state->depth] & BNJ_VAL_INCOMPLETE){
+							SETSTATE(state->flags, BNJ_ERR_EXTRA_COMMA);
+							return i;
+						}
 
 						/* If positive depth change, call user cb. */
 						if(state->depth_change > 0){
