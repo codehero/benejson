@@ -8,12 +8,6 @@
 void OutputValue(BNJ::PullParser& parser){
 	const bnj_val& val = parser.GetValue();
 
-	if(val.key_length){
-		char key[512];
-		BNJ::GetKey(key, 1024, parser);
-		fprintf(stdout, "key: '%s'\n", key);
-	}
-
 	switch(bnj_val_type(&val)){
 		case BNJ_NUMERIC:
 			if(val.exp_val){
@@ -116,7 +110,18 @@ int main(int argc, const char* argv[]){
 		/* Begin a tree walk. */
 		bool running = true;
 		while(running){
-			switch(parser.Pull()){
+			unsigned ret = parser.Pull();
+
+			if(parser.ValidValue()){
+				const bnj_val& val = parser.GetValue();
+				if(val.key_length){
+					char key[512];
+					BNJ::GetKey(key, 1024, parser);
+					fprintf(stdout, "key: '%s'\n", key);
+				}
+			}
+
+			switch(ret){
 				/* Stop when there is no more data. */
 				case BNJ::PullParser::ST_NO_DATA:
 					running = false;
