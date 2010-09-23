@@ -285,7 +285,14 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 						break;
 					}
 					else if(s_lookup[*i] & CEND){
-						/* FIXME ensure list/map match against the stack! */
+						/* ensure list/map match against the stack! */
+						char check =
+							(state->stack[state->depth] & BNJ_OBJECT)
+								? '}' : ']';
+						if(*i != check){
+							SETSTATE(state->flags, BNJ_ERR_LISTMAP_MISMATCH);
+							return i;
+						}
 
 						/* Make sure that we do not end clause with incomplete values. */
 						if(state->stack[state->depth] & BNJ_VAL_INCOMPLETE){
