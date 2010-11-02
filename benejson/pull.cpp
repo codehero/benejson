@@ -153,7 +153,7 @@ BNJ::PullParser::invalid_value::invalid_value(const char* blurb,
 
 /* Only initialize the read state here to NULL values. */
 BNJ::PullParser::PullParser(unsigned maxdepth, uint32_t* stack_space)
-	: _parser_state(ST_NO_DATA), _buffer(NULL), _len(0), _reader(NULL)
+	: _parser_state(ST_NO_DATA), _buffer(NULL), _data(NULL), _len(0), _reader(NULL)
 {
 	/* Will not operate with a callback. */
 	_ctx.user_cb = NULL;
@@ -244,20 +244,45 @@ unsigned BNJ::PullParser::ChunkRead8(char* dest, unsigned destlen,
 
 void BNJ::PullParser::Begin(uint8_t* buffer, unsigned len, Reader* reader) throw(){
 	_buffer = buffer;
+	_data = _buffer;
 	_len = len;
 	_reader = reader;
-	_total_parsed = 0;
-	_total_pulled = 0;
 
 	/* Reset state. */
 	_depth = 0;
-	_first_empty = 0;
 	_val_idx = 0;
 	_val_len = 0;
+	_utf8_remaining = 0;
+	_total_parsed = 0;
+	_total_pulled = 0;
 
 	/* Initialize here since _offset uses _first_unparsed as a default. */
 	_first_unparsed = 0;
+	_first_empty = 0;
+
+	_state = PARSE_ST;
+	_parser_state = ST_BEGIN;
+}
+
+void BNJ::PullParser::Begin(const uint8_t* buffer, unsigned len) throw(){
+	_buffer = NULL;
+	_data = buffer;
+	_len = len;
+	_reader = NULL;
+
+	/* Reset state. */
+	_depth = 0;
+	_val_idx = 0;
+	_val_len = 0;
 	_utf8_remaining = 0;
+	_total_parsed = 0;
+	_total_pulled = 0;
+
+	/* Initialize here since _offset uses _first_unparsed as a default. */
+	_first_unparsed = 0;
+
+	/* Buffer already contains entire JSON data. */
+	_first_empty = len;
 
 	_state = PARSE_ST;
 	_parser_state = ST_BEGIN;
@@ -328,8 +353,8 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 					 * Update parsed counter. */
 					_total_pulled = _total_parsed;
 					const uint8_t* res = bnj_parse(&_pstate, &_ctx,
-						_buffer + _first_unparsed, _first_empty - _first_unparsed);
-					_total_parsed += res - (_buffer + _first_unparsed);
+						_data + _first_unparsed, _first_empty - _first_unparsed);
+					_total_parsed += res - (_data + _first_unparsed);
 
 					/* Abort on error. */
 					if(_pstate.flags & BNJ_ERROR_MASK)
@@ -357,7 +382,7 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 					}
 
 					/* Advance first unparsed to where parsing ended. */
-					_first_unparsed = res - _buffer;
+					_first_unparsed = res - _data;
 
 					/* If read any semblance of values, then switch to value state. */
 					if(_pstate.vi){
@@ -403,6 +428,8 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 					/* If key is incomplete or non-string value incomplete,
 					 * then attempt to read full value. */
 					if(bnj_incomplete(&_pstate, tmp)){
+						if(NULL == _buffer)
+							throw std::runtime_error("Incomplete buffer.");
 
 						/* If string value then ChunkRead*() will handle fragmentation. */
 						if(type == BNJ_STRING){
@@ -467,6 +494,11 @@ BNJ::PullParser::State BNJ::PullParser::Up(void){
  * -_buffer
  * */
 void BNJ::PullParser::FillBuffer(unsigned end_bound){
+	/* If started parsing with NULL reader, buffer DID not contain entire
+	 * JSON contents. */
+	if(!_reader)
+		throw std::runtime_error("Incomplete buffer.");
+
 	_first_empty %= _len;
 	_first_unparsed = _first_empty;
 	while(_first_empty < end_bound){

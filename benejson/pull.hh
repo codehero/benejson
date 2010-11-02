@@ -116,6 +116,13 @@ namespace BNJ {
 			 *  @param reader From where to pull data. */
 			void Begin(uint8_t* buffer, unsigned len, Reader* reader) throw();
 
+			/** @brief Prepare parser for iteration operations.
+			 *  Does NOT Pull any values.
+			 *  Allows instance reuse.
+			 *  @param buffer Contains all raw JSON data to be parsed.
+			 *  @param len Size of buffer */
+			void Begin(const uint8_t* buffer, unsigned len) throw();
+
 			/** @brief Pull next value
 			 *  Calling Pull() invalidates values from a previous Pull() call.
 			 *  @param key_set Lexigraphically sorted array of keys to match
@@ -160,6 +167,10 @@ namespace BNJ {
 			 *  (descending states do not have valid values available) */
 			bool ValidValue(void) const;
 
+			/** @brief Whether parser is currently in a map
+			 *  @return If true, then BNJ::GetKey is also defined. */
+			bool InMap(void) const;
+
 			/** @brief Retrieve current parser state.
 			 * @return After Begin() and before first Pull() call, returns ST_BEGIN.
 			 * Otherwise, identical to return value from Pull() */
@@ -169,6 +180,9 @@ namespace BNJ {
 			 *  @return true if parser descended after Pull(); false otherwise. */
 			bool Descended(void) const;
 
+			/** @brief Convenience function to interpret state if parser ascended.
+			 *  @return true if parser ascended after Pull(); false otherwise. */
+			bool Ascended(void) const;
 
 			/* Utility functions. */
 
@@ -225,6 +239,9 @@ namespace BNJ {
 			/** @brief Buffer scratch space. */
 			uint8_t* _buffer;
 
+			/** @brief Read only pointer to data. */
+			const uint8_t* _data;
+
 			/** @brief Size of _buffer */
 			unsigned _len;
 
@@ -275,7 +292,7 @@ namespace BNJ {
 	 *  @param destlen Maximum size of destination.
 	 *  @param p Parser instance.
 	 *  @return Number of bytes copied, excluding null terminator.
-	 *  @throw destlen < key length or not in a MAP context. */
+	 *  @throw destlen < key length. */
 	unsigned GetKey(char* dest, unsigned destlen, const PullParser& p);
 
 	void Get(unsigned& dest, const PullParser& p, unsigned key_enum = 0xFFFFFFFF);
@@ -318,12 +335,20 @@ inline bool BNJ::PullParser::ValidValue(void) const{
 	return _val_idx < _val_len;
 }
 
+inline bool BNJ::PullParser::InMap(void) const{
+	return _pstate.stack[_depth] & BNJ_OBJECT;
+}
+
 inline BNJ::PullParser::State BNJ::PullParser::GetState(void) const{
 	return _parser_state;
 }
 
 inline bool BNJ::PullParser::Descended(void) const{
 	return (_parser_state == ST_MAP || _parser_state == ST_LIST);
+}
+
+inline bool BNJ::PullParser::Ascended(void) const{
+	return (_parser_state == ST_ASCEND_MAP || _parser_state == ST_ASCEND_LIST);
 }
 
 inline const bnj_state& BNJ::PullParser::c_state(void) const{
@@ -339,7 +364,7 @@ inline unsigned BNJ::PullParser::Depth(void) const{
 }
 
 inline const uint8_t* BNJ::PullParser::Buff(void) const{
-	return _buffer + _offset;
+	return _data + _offset;
 }
 
 inline unsigned BNJ::PullParser::BuffLen(void) const{
