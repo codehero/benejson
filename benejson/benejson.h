@@ -387,7 +387,6 @@ uint8_t* bnj_fragcompact(bnj_val* frag, uint8_t* buffer, uint32_t* len);
 unsigned bnj_incomplete(const bnj_state* state, const bnj_val* src);
 
 
-
 /* String length counting functions. */
 
 /** @brief Get UTF-8 string value length count.
