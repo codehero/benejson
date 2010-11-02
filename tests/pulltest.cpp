@@ -112,13 +112,10 @@ int main(int argc, const char* argv[]){
 		while(running){
 			unsigned ret = parser.Pull();
 
-			if(parser.ValidValue()){
-				const bnj_val& val = parser.GetValue();
-				if(val.key_length){
-					char key[512];
-					BNJ::GetKey(key, 1024, parser);
-					fprintf(stdout, "key: '%s'\n", key);
-				}
+			if(parser.InMap() && ! parser.Ascended()){
+				char key[1024];
+				BNJ::GetKey(key, 1024, parser);
+				fprintf(stdout, "key: '%s'\n", key);
 			}
 
 			switch(ret){
