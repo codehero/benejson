@@ -515,7 +515,7 @@ void BNJ::PullParser::FillBuffer(unsigned end_bound){
 	}
 
 	/* If buffer did not fill then error. */
-	if(0 == _first_empty)
+	if(0 == _first_empty - _first_unparsed)
 		throw std::runtime_error("PullParser::Pull early EOF.");
 }
 
