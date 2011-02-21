@@ -42,36 +42,122 @@
       <span class="small">by <a href="http://github.com/codehero">codehero</a></span></h1>
 
     <div class="description">
-      BeneJSON JSON parsing library. 
-    </div>
+			benejson is a buffering SAX-style JSON parser library. The library package contains 3 major components:
+		</div>
+		<ul>
+			<li><a href="benejsonjs.html">benejson.js</a>: SAX-style parser written in Javascript</li>
+			<li><a href="pullparser.html">PullParser</a>: A C++ class for JSON pull parsing</li>
+			<li><a href="core.html">Core</a>: The parsing core with minimal dependencies</li>
+		</ul>
 
-    <p>BeneJSON is a JSON input library with a core written in C and wrapped with a high level C++ interface. The core is meant to be fast, minimal and easy to integrate directly into source. The high level interfaces make it easy to use in C++. In the future, other scripting languages will wrap the core.
-</p><h2>Dependencies</h2>
-<p>libc, STL exceptions</p>
+    <p></p><h2>Dependencies</h2>
+<p>libc type definitions, STL exceptions</p>
 <h2>Install</h2>
-<p>Currently builds with scons. Setup scripts (make, ebuilds, etc) contributions welcome.</p>
+<p>C/C++ code builds with scons. Setup scripts (make, ebuilds, etc) contributions welcome.</p>
 <h2>License</h2>
 <p>MIT/X License</p>
 <h2>Authors</h2>
 <p>David Bender (codehero@gmail.com)<br/><br/>      </p>
 <h2>Contact</h2>
 <p>David Bender (codehero@gmail.com)<br/>Mailing List (benejson@librelist.com)<br/>      </p>
+    <h2>Goals</h2>
+    <p>
+		<ul>
+			<li>Easy integration into existing project</li>
+			<li>By design, make memory leaks impossible</li>
+			<li>By design, use zero mutexes in multithreaded environments</li>
+			<li>By design, eliminate locale dependent parsing issues</li>
+			<li>Provide intuitive and modular parser for use in Javascript</li>
+			<li>Provide easy to use C++ library</li>
+			<li>Provide extensibility to arbitrarily sized numbers.</li>
+		</ul>
+		</p>
+
+    <h2>Special Features</h2>
+    <p>
+		<ul>
+			<li>ZERO use of malloc and global variables in core and pull parser</li>
+			<li>Additional support for NaN and Infinity values</li>
+		 	<li>User can provide an alphabetically sorted array of character strings against which the library will match map keys. The library will tag each value with the index of user's array, thus speeding up value identification within maps.</li>
+			<li>C core provides both callback and return (pulling) style parsing</li>
+	 	</ul>
+		</p>
 
     <h2>Applications</h2>
     <p>
 		<ul>
-			<li>Basis for python, ruby, node.js  wrapper</li>
+			<li>Parse CouchDB responses without downloading entire web request</li>
+			<li>Basis for JSON parsing bindings in python, ruby, node.js</li>
 			<li>Use in embedded systems</li>
 			<li>jsonoise could be used to test input validation</li>
 		</ul>
 		</p>
 
-    <h2>Project Ideas</h2>
+    <h2>What's Needed</h2>
     <p>
 		<ul>
-			<li>Create erlang wrapper around BeneJSON</li>
-			<li>from rmorrison: Accelerate CouchDB performance by replacing mochijson with erlang wrapper around BeneJSON</li>
+			<li>Add support for more build systems (make, Visual Studio, etc)</li>
+			<li>Install packages (ebuild, .deb, .rpm, etc)</li>
+			<li>Test scripts</li>
+			<li>Efficiency measurements, benchmarks</li>
 		</ul>
+		</p>
+
+    <h2>Motivations</h2>
+    <p>
+		<ul>
+			<li>Why not use an existing tree building library:</li>
+			<ul>
+				<li>Tree building libraries are convenient, but have many drawbacks:</li>
+				<li>Undesirable for large inputs, as the entirety of the input must be parsed before the user sees the first glimpse of data.</li>
+				<li>The input tree's structure could require conversion to a different tree structure.</li>
+				<li>They are typically built on some kind of lower level parsing library anyway.</li>
+				<li>Unless you are working directly in javascript, it is impossible to deliver a Tree class with general appeal.</li>
+			</ul>
+
+			<li>Why not use an existing callback library:</li>
+			<ul>
+				<li>Callback based libraries (cjson, yajl) typically require the user to define callback functions based on TYPE.</li>
+				<li>This is a poor approach because the parser is forced to eagerly interpret values before giving them to the user.</li>
+				<li>Thus, if the user wants to read a float, but the parser reads '1', then the parser calls the integer callback! yajl kludges around this by providing yet another callback.</li>
+				<li>Interpreting data is always based on SCOPE, so organizing callbacks by TYPE is incongruous.</li>
+				<li>These libraries waste cycles dynamically allocating memory to make large strings contiguous and in UTF-8 format.</li>
+				<li>Some users may want UTF-16 or UTF-32 strings. These libraries only deliver UTF-8 string.</li>
+				<li>Some libraries refuse to support NaN or +/- Infinity values. Although against the spec, I personally have a Real Demand for these.</li>
+			</ul>
+
+			<li>Why use benejson:</li>
+			<ul>
+				<li>benejson only requires the user to define a single callback. The callback provides the user with two sets of information:</li>
+				<ul>
+					<li>Change in JSON context (up/down the stack, array or map).</li>
+					<li>How many data read.</li>
+				</ul>
+				<li>benejson will classify each datum as a String, Numeric, or Special (true, false, null) or optionally (NaN, +/- Infinity).</li>
+				<li>The user calls helper functions to convert the datum to the desired type (float, int, UTF-8 string, etc).</li>
+				<li>There are sensible restrictions on conversion (ie, no conversion from Numeric to UTF-8 and vice versa).</li>
+				<li>benejson records the length of string fragments and reports how many bytes the fragment would require in UTF-8,UTF-16, and UTF-32.</li>
+				<li>benejson does not use a single piece of global state, especially not malloc(). There is no possibility of a memory leak.</li>
+			</ul>
+
+			<li>benejson caveats:</li>
+			<ul>
+				<li>benejson forces the user to do their own string allocation. To keep with the design goals, benejson may deliver strings in fragments. Depending on the circumstances this a good or bad thing.</li>
+				<li>It is good because simple pieces of information like names, email addresses, etc are generally bounded to reasonably small values.</li>
+				<li>The PullParser interface lets the user read into stack allocated strings, with no fear overflow.</li>
+				<li>It is bad because the user may be expecting a large string (such as an email) which benejson would be forced to deliver in chunks.</li>
+				<li>However, much like one would read a file in chunks, the same strategy may be employed with benejson and large strings.</li>
+				<li>The user may also opt to use a raw data buffer size exceeding the largest allowable input, which eliminates string fragmentation.</li>
+			</ul>
+
+			<li>The C core seems too complicated for ordinary use.</li>
+			<ul>
+				<li>Use the <a href="pullparser.html">C++ Pull Parser</a></li>
+				<li>I will implement an easier C++ callback interface if necessary.</li>
+				<li>Build a binding for your favorite scripting language.</li>
+			</ul>
+		</ul>
+
 		</p>
 
     <h2>Download</h2>

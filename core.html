@@ -71,17 +71,25 @@
 		</ul>
 		</p>
 
-    <h2>Design</h2>
+    <h2>Design and Features</h2>
     <p>
 		<ul>
 			<li>Parse function that operates either in callback mode or element pulling mode.</li>
-			<li>No malloc calls in the core.</li>
+			<li>Does not eagerly parse numeric or string values</li>
+			<li>No malloc calls in the core, so by design there are no memory leaks.</li>
+			<li>ZERO use of global variables, including malloc calls</li>
+			<li>Inhibit DoS attacks by limiting depth and avoiding eager evaluations</li>
+			<li>Noneager, conversion by function permits integers to be interpreted as floats</li>
 			<li>Interpreting data values is done by extracting strings or values from the input buffer, into a buffer allocated by the user.</li>
 			<li>The parsing library tracks the length of JSON strings, so that the user will know how much memory to allocate.</li>
 			<li>Strings that cross fragments are reported as fragments to the user</li>
 			<li>User may specify an array of sorted strings as keys to match against when parsing. When the library reports the key to the user, it will report the index of the key in the array. This eliminates the need to strcmp() a priori known key strings.</li>
 		</ul>
 
+    <h2>Usage</h2>
+    <p>
+		Please see source package or github repository.
+		</p>
 
     <h2>Project Ideas</h2>
     <p>
