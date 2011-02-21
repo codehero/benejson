@@ -1,7 +1,7 @@
 /* Copyright (c) 2010 David Bender assigned to Benegon Enterprises LLC
  * See the file LICENSE for full license information.
  *
- * Version 0.9.1, May 12 2010
+ * Version 0.9.5, February 21 2011
  * */
 
 #ifndef __BENEGON_BNJ_H__
