@@ -1,0 +1,74 @@
+{
+	"testing":[
+		1,
+		2,
+		3
+	],
+	"header":{
+		"type":"Config\\\"gent",
+		"key1":"Some \"Name",
+		"key2":"\\",
+		"\\weirdkey":"Config"
+	},
+
+	"something":[
+		4,
+		NaN,
+		Infinity,
+		-Infinity,
+		-1.04,
+		-1E4,
+		"Test String",
+		[],
+		{
+			"table":{
+			}
+			"chair":1
+		}
+		5
+	],
+
+	"arr":[
+		3,
+		4,
+		5
+	],
+
+	"arrMap":[
+		{
+			"location":1,
+			"place":2
+		},
+		{
+			"location":2,
+			"place":3
+		},
+		{
+			"location":3,
+			"place":4
+		},
+		{
+			"location":4,
+			"place":5
+		}
+	],
+	
+	"mapMap":{
+		"outerId1":{
+			"location":1,
+			"place":2
+		},
+		"outerId2":{
+			"location":1,
+			"place":2
+		},
+		"outerId3":{
+			"location":1,
+			"place":2
+		}
+	},
+
+	"something":{
+		"at":"theEnd"
+	}
+}
