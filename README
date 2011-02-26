@@ -35,6 +35,12 @@ RUNNING TESTS
 	 the web pages for system installation packages.
   -As a development package, this doesn't really establish linking rules.
 	 If you get linker errors, point LD_LIBRARY_PATH to the lib directory.
+	-cdb-view.js is meant to take as stdin input a couchdb view response.
+	-Run
+
+	 node nodetest.js < config.json
+
+	 as demonstration of the library.
 
 NOTES
 

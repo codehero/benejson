@@ -6,6 +6,7 @@ var viewParser = {
 	/* Force distinct callback for beginning of map.
 	 * Key will be null here. */
 	"{":function(key){
+		sys.puts("Beginning couchdb response..");
 	},
 
 	/* Catchall for other data.
@@ -33,13 +34,12 @@ var viewParser = {
 		},
 		function(){
 			sys.puts("Ended Rows.");
-		},
-		function(err){
 		}
 	],
 
 	/* Force distinct callback for end of map. */
 	"}":function(){
+		sys.puts("Ending couchdb response..");
 	}
 }
 
