@@ -285,7 +285,8 @@ JSONTokenizer.prototype.strFn['\\'] = function(tokenizer){
 JSONTokenizer.prototype.escapeMap = {
 	"b" : '\b',
 	"/" : '/',
-	"f" : '\n',
+	"n" : '\n',
+	"f" : '\f',
 	"r" : '\r',
 	"t" : '\t'
 };
