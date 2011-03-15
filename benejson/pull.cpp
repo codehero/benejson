@@ -375,7 +375,7 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 							_pstate.v[i].key_offset += frag_key_len;
 							_pstate.v[i].strval_offset += frag_key_len;
 						}
-						_pstate.v->key_offset += 0;
+						_pstate.v->key_offset = 0;
 
 						frag_key_len = 0;
 						_offset = 0;
