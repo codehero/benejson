@@ -11,6 +11,9 @@ conf = Configure(lib_env)
 if not conf.CheckFunc("stpcpy"):
 	print "Did not find stpcpy(), using bnj local version"
 	conf.env.Append(CPPDEFINES = ["-Dstpcpy=bnj_local_stpcpy"])
+
+if not conf.CheckFunc("stpncpy"):
+	print "Did not find stpncpy(), using bnj local version"
 	conf.env.Append(CPPDEFINES = ["-Dstpncpy=bnj_local_stpncpy"])
 lib_env = conf.Finish()
 
