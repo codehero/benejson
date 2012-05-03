@@ -1163,6 +1163,15 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 	}
 	else{
 		state->_paf_type = 0;
+
+		if(state->depth_change){
+			if(uctx->user_cb){
+				if(uctx->user_cb(state, uctx, buffer)){
+					SETSTATE(state->flags, BNJ_ERR_USER);
+					return i;
+				}
+			}
+		}
 	}
 	return i;
 }
