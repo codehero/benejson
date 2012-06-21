@@ -20,7 +20,7 @@ lib_env = conf.Finish()
 # Helps windows/mingw get the medicine down
 lib_env["WINDOWS_INSERT_DEF"] = 1
 
-lstatic = lib_env.StaticLibrary('benejson', Split('benejson.c pull.cpp memreader.cpp'))
-lt = lib_env.SharedLibrary('benejson', Split('benejson.c pull.cpp memreader.cpp'))
+lstatic = lib_env.StaticLibrary('benejson', Split('benejson.c pull.cpp'))
+lt = lib_env.SharedLibrary('benejson', Split('benejson.c pull.cpp'))
 lib_env.Install(bin_env.LibDest, [lt, lstatic])
-lib_env.Install(lib_env.IncDest + "/benejson", Split('benejson.h pull.hh memreader.hh'))
+lib_env.Install(lib_env.IncDest + "/benejson", Split('benejson.h pull.hh'))
