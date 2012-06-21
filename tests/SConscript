@@ -18,6 +18,8 @@ spam = bin_env.Program("spam", source = [posix, "spam.cpp"], LIBS=Split("benejso
 
 jsontool = bin_env.Program("jsontool", source = ["jsontool.c"], LIBS=Split("benejson m"));
 
+jsongrab = bin_env.Program("jsongrab", source = [posix, "jsongrab.cpp"], LIBS=Split("benejson m"));
+
 bin_env.Install(bin_env.BinDest, step)
 bin_env.Install(bin_env.BinDest, json)
 bin_env.Install(bin_env.BinDest, jbuff)
@@ -27,3 +29,4 @@ bin_env.Install(bin_env.BinDest, spam)
 bin_env.Install(bin_env.BinDest, jsontool)
 bin_env.Install(bin_env.BinDest, verify)
 bin_env.Install(bin_env.BinDest, jsonoise)
+bin_env.Install(bin_env.BinDest, jsongrab)
