@@ -141,6 +141,8 @@ int main(int argc, const char* argv[]){
 						throw PullParser::invalid_value("Expected key in data!", data_parser);
 					if(0 == data_parser.GetValue().key_enum)
 						break;
+					if(data_parser.Descended())
+						data_parser.Up();
 				}
 			}
 			else
