@@ -135,6 +135,29 @@ enum {
 	BNJ_STK_CTX_MASK = 0x1
 };
 
+/** @brief Flags to enforce certain input constraints. */
+enum {
+	/** @brief Only allow special values strictly defined by JSON (no Inf, NaN) */
+	BNJ_CHK_STRICT_SPECIAL = 0x1,
+
+	/** @brief Do not allow strings that require escape '\' when encoded in JSON
+	 * Note that this does not exclude \uXXXX, since that can be expressed
+	 * in straight up UTF-8. */
+	BNJ_CHK_NO_STD_ESCAPES = 0x2,
+
+	/** @brief Exclude 2 byte code pages from strings. */
+	BNJ_CHK_NO_CP_2 = 0x4,
+
+	/** @brief Exclude 3 byte code pages from strings. */
+	BNJ_CHK_NO_CP_3 = 0x8,
+
+	/** @brief Exclude 4 byte code pages from strings. */
+	BNJ_CHK_NO_CP_4 = 0x10,
+
+	/** @brief Only allow ASCII range strings, for all those who stick to 7 bits. */
+	BNJ_CHK_ASCII_ONLY = 0x1C,
+};
+
 
 /** @brief Error codes. */
 enum {
@@ -201,6 +224,9 @@ enum {
 	/** @brief User halted parsing. */
 	BNJ_ERR_USER,
 
+	/** @brief Parsing encountered condition that violated user constraint. */
+	BNJ_ERR_USER_CHECK,
+
 	/** @brief Just used for counting number of error types. */
 	BNJ_ERROR_SENTINEL,
 
@@ -238,6 +264,9 @@ typedef struct bnj_ctx_s{
 	/** @brief Length of key set.
 	 * THIS SHOULD NEVER CHANGE WHILE IN KEY FRAGMENT STATE. */
 	unsigned key_set_length;
+
+	/** @brief BNJ_CHK flags to apply to parsing. */
+	unsigned check_flags;
 } bnj_ctx;
 
 

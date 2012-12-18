@@ -159,6 +159,7 @@ BNJ::PullParser::PullParser(unsigned maxdepth, uint32_t* stack_space)
 	_ctx.user_cb = NULL;
 	_ctx.key_set = NULL;
 	_ctx.key_set_length = 0;
+	_ctx.check_flags = 0;
 
 	/* Allocate the state stack. */
 	bnj_state_init(&_pstate, stack_space, maxdepth);

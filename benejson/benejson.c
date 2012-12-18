@@ -506,6 +506,13 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 						++curval->significand_val;
 					case 'N':
 						++curval->significand_val;
+
+						/* Check if user constraint should be enforced. */
+						if(uctx->check_flags & BNJ_CHK_STRICT_SPECIAL){
+							SETSTATE(state->flags, BNJ_ERR_USER_CHECK);
+							return i;
+						}
+
 					case 'n':
 						++curval->significand_val;
 					case 't':
@@ -676,10 +683,17 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 						return i;
 					}
 					else if(*i & 0x80){
+
 						/* Process first byte. */
 						state->_cp_fragment = *i;
 						if((*i & 0xF8) == 0xF0){
 							/* CINV flag set on invalid 0xF5...*/
+
+							/* Check if user constraint should be enforced. */
+							if(uctx->check_flags & BNJ_CHK_NO_CP_4){
+								SETSTATE(state->flags, BNJ_ERR_USER_CHECK);
+								return i;
+							}
 
 							/* 4 byte code point. Will shift by 18 bits, store 21 high bits. */
 							state->_cp_fragment &= 0x07;
@@ -687,6 +701,13 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 							SETSTATE(state->flags, BNJ_STR_UTF3);
 						}
 						else if((*i & 0xF0) == 0xE0){
+
+							/* Check if user constraint should be enforced. */
+							if(uctx->check_flags & BNJ_CHK_NO_CP_3){
+								SETSTATE(state->flags, BNJ_ERR_USER_CHECK);
+								return i;
+							}
+
 							/* 3 byte code point. Will shift by 12 bits, store 14 high bits. */
 							state->_cp_fragment &= 0x0F;
 							state->_cp_fragment |= 0xFFFC0000;
@@ -695,6 +716,12 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 						else if((*i & 0xE0) == 0xC0){
 							/* NOTE: 0xC0-0xC1 are already marked invalid in table,
 							 * so don't bother testing here. */
+
+							/* Check if user constraint should be enforced. */
+							if(uctx->check_flags & BNJ_CHK_NO_CP_2){
+								SETSTATE(state->flags, BNJ_ERR_USER_CHECK);
+								return i;
+							}
 
 							/* 2 byte code point. Will shift by 6 bits, store 7 high bits. */
 							state->_cp_fragment &= 0x1F;
@@ -851,6 +878,11 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 
 			case BNJ_STR_ESC:
 						if('u' == *i){
+							/* Check if user constraint should be enforced. */
+							if(uctx->check_flags & BNJ_CHK_ASCII_ONLY){
+								SETSTATE(state->flags, BNJ_ERR_USER_CHECK);
+								return i;
+							}
 
 							/* Starting new UTF-16 code point, so reset cp frag.
 							 * However, if processed a first surrogate half, ensure
@@ -936,14 +968,36 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 										|| state->_cp_fragment >= 0xE000)
 									{
 										/* Increment appropriate cp count. */
-										if(state->_cp_fragment < 0x80)
+										if(state->_cp_fragment < 0x80){
 											++curval->cp1_count;
-										else if(state->_cp_fragment < 0x800)
+										}
+										else if(state->_cp_fragment < 0x800){
 											++curval->cp2_count;
-										else if(state->_cp_fragment < 0x10000)
+
+											/* Check if user constraint should be enforced. */
+											if(uctx->check_flags & BNJ_CHK_NO_CP_2){
+												SETSTATE(state->flags, BNJ_ERR_USER_CHECK);
+												return i;
+											}
+										}
+										else if(state->_cp_fragment < 0x10000){
 											++curval->cp3_count;
-										else
+
+											/* Check if user constraint should be enforced. */
+											if(uctx->check_flags & BNJ_CHK_NO_CP_3){
+												SETSTATE(state->flags, BNJ_ERR_USER_CHECK);
+												return i;
+											}
+										}
+										else{
 											++curval->exp_val;
+
+											/* Check if user constraint should be enforced. */
+											if(uctx->check_flags & BNJ_CHK_NO_CP_4){
+												SETSTATE(state->flags, BNJ_ERR_USER_CHECK);
+												return i;
+											}
+										}
 
 										/* If at beginning of parse _cp_fragment was not BNJ_EMPTY_CP,
 										 * copy the completed _cp_fragment to significand_val. */
@@ -974,6 +1028,12 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 							break;
 						}
 						else{
+							/* Check if user constraint should be enforced. */
+							if(uctx->check_flags & BNJ_CHK_NO_STD_ESCAPES){
+								SETSTATE(state->flags, BNJ_ERR_USER_CHECK);
+								return i;
+							}
+
 							if(!(s_lookup[*i] & CESC)){
 								SETSTATE(state->flags, BNJ_ERR_INV_ESC);
 								return i;
