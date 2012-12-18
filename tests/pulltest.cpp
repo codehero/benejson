@@ -9,7 +9,7 @@ void OutputValue(BNJ::PullParser& parser){
 	const bnj_val& val = parser.GetValue();
 
 	switch(bnj_val_type(&val)){
-		case BNJ_NUMERIC:
+		case BNJ_VT_NUMERIC:
 			if(val.exp_val){
 				double f;
 				BNJ::Get(f, parser);
@@ -29,7 +29,7 @@ void OutputValue(BNJ::PullParser& parser){
 			}
 			break;
 
-		case BNJ_SPECIAL:
+		case BNJ_VT_SPECIAL:
 			switch(val.significand_val){
 				case BNJ_SPC_FALSE:
 					fprintf(stdout, "bool: false\n");
@@ -54,13 +54,13 @@ void OutputValue(BNJ::PullParser& parser){
 			}
 			break;
 
-		case BNJ_ARR_BEGIN:
+		case BNJ_VT_ARR_BEGIN:
 			break;
 
-		case BNJ_OBJ_BEGIN:
+		case BNJ_VT_OBJ_BEGIN:
 			break;
 
-		case BNJ_STRING:
+		case BNJ_VT_STRING:
 			{
 				/* Can read the length of the string fragment before consuming
 				unsigned outlen = bnj_strlen8(&parser.GetValue());

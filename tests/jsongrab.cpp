@@ -14,7 +14,7 @@ void s_print_value(PullParser& data_parser){
 	const bnj_val& v = data_parser.GetValue();
 	unsigned type = bnj_val_type(&v);
 	switch(type){
-		case BNJ_NUMERIC:
+		case BNJ_VT_NUMERIC:
 			/* If nonzero exponent, then float. */
 			if(v.exp_val){
 				double d;
@@ -35,7 +35,7 @@ void s_print_value(PullParser& data_parser){
 			}
 			break;
 
-		case BNJ_STRING:
+		case BNJ_VT_STRING:
 			/* TODO loop to get entire string value..for now just output fixed chars. */
 			{
 				char buffer[1024];
@@ -44,7 +44,7 @@ void s_print_value(PullParser& data_parser){
 			}
 			break;
 
-		case BNJ_SPECIAL:
+		case BNJ_VT_SPECIAL:
 			{
 				static const char* special[BNJ_COUNT_SPC] = {
 					"false",
@@ -104,7 +104,7 @@ int main(int argc, const char* argv[]){
 
 			const bnj_val& v = path_parser.GetValue();
 			unsigned type = bnj_val_type(&v);
-			if(BNJ_NUMERIC == type){
+			if(BNJ_VT_NUMERIC == type){
 				/* Data parser must be in an array. */
 				if(data_parser.InMap())
 					throw PullParser::invalid_value("Expected array in data!", data_parser);
@@ -123,7 +123,7 @@ int main(int argc, const char* argv[]){
 					++count;
 				} while(count < idx);
 			}
-			else if(BNJ_STRING == type){
+			else if(BNJ_VT_STRING == type){
 				/* Data parser must be in a map. */
 				if(!data_parser.InMap())
 					throw PullParser::invalid_value("Expected map in data!", data_parser);

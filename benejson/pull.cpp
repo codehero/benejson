@@ -181,8 +181,8 @@ unsigned BNJ::PullParser::ChunkRead8(char* dest, unsigned destlen,
 	/* Verify enum and type. */
 	if(key_enum != 0xFFFFFFFF && val.key_enum != key_enum)
 		s_throw_key_error(*this, key_enum);
-	if(bnj_val_type(&val) != BNJ_STRING)
-		s_throw_type_error(*this, BNJ_STRING);
+	if(bnj_val_type(&val) != BNJ_VT_STRING)
+		s_throw_type_error(*this, BNJ_VT_STRING);
 
 	while(out_remaining > _utf8_remaining || !dest){
 		bnj_val& val = _valbuff[_val_idx];
@@ -314,7 +314,7 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 		 * ONLY STRINGS should make it here.
 		 * Call ChunkRead8() until nothing left.. */
 		if(bnj_incomplete(&_pstate, tmp)){
-			assert(bnj_val_type(tmp) == BNJ_STRING);
+			assert(bnj_val_type(tmp) == BNJ_VT_STRING);
 			while(ChunkRead8(NULL, 0));
 		}
 
@@ -400,11 +400,11 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 			case DEPTH_LAG_ST:
 				if(_depth < _pstate.depth){
 					++_depth;
-					_parser_state = (_pstate.stack[_depth] & BNJ_OBJECT) ? ST_MAP : ST_LIST;
+					_parser_state = (_pstate.stack[_depth] & BNJ_STK_OBJECT) ? ST_MAP : ST_LIST;
 					return _parser_state;
 				}
 				else if(_depth > _pstate.depth){
-					_parser_state = (_pstate.stack[_depth] & BNJ_OBJECT) ? ST_ASCEND_MAP
+					_parser_state = (_pstate.stack[_depth] & BNJ_STK_OBJECT) ? ST_ASCEND_MAP
 						: ST_ASCEND_LIST;
 					--_depth;
 					return _parser_state;
@@ -422,7 +422,7 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 
 					/* Remember number of UTF-8 characters.
 					 * ChunkRead*() will need this initialized. */
-					if(type == BNJ_STRING)
+					if(type == BNJ_VT_STRING)
 						_utf8_remaining = bnj_strlen8(tmp);
 
 					/* If key is incomplete or non-string value incomplete,
@@ -432,7 +432,7 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 							throw std::runtime_error("Incomplete buffer.");
 
 						/* If string value then ChunkRead*() will handle fragmentation. */
-						if(type == BNJ_STRING){
+						if(type == BNJ_VT_STRING){
 							_state = VALUE_ST;
 							_parser_state = ST_DATUM;
 							return ST_DATUM;
@@ -445,7 +445,7 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 						 * fragment shift should not be very expensive. */
 
 						/* Bias key offsets before shifting fragment.
-						 * Note strval_offset only applies to BNJ_STRING. */
+						 * Note strval_offset only applies to BNJ_VT_STRING. */
 						tmp->key_offset += _offset;
 						unsigned length = _len;
 						uint8_t* start = bnj_fragcompact(tmp, _buffer, &length);
@@ -464,7 +464,7 @@ BNJ::PullParser::State BNJ::PullParser::Pull(char const * const * key_set,
 					_parser_state = ST_DATUM;
 
 					/* If beginning map or list, then lagging depth. */
-					if(BNJ_ARR_BEGIN == type || BNJ_OBJ_BEGIN == type){
+					if(BNJ_VT_ARR_BEGIN == type || BNJ_VT_OBJ_BEGIN == type){
 						_state = DEPTH_LAG_ST;
 						break;
 					}
@@ -533,8 +533,8 @@ void BNJ::Get(unsigned& u, const PullParser& p, unsigned key_enum){
 	const bnj_val& val = p.GetValue();
 	if(key_enum != 0xFFFFFFFF && val.key_enum != key_enum)
 		s_throw_key_error(p, key_enum);
-	if(bnj_val_type(&val) != BNJ_NUMERIC)
-		s_throw_type_error(p, BNJ_NUMERIC);
+	if(bnj_val_type(&val) != BNJ_VT_NUMERIC)
+		s_throw_type_error(p, BNJ_VT_NUMERIC);
 
 	if(val.exp_val)
 		throw PullParser::invalid_value("Non-integral numeric value!", p);
@@ -550,8 +550,8 @@ void BNJ::Get(int& ret, const PullParser& p, unsigned key_enum){
 	const bnj_val& val = p.GetValue();
 	if(key_enum != 0xFFFFFFFF && val.key_enum != key_enum)
 		s_throw_key_error(p, key_enum);
-	if(bnj_val_type(&val) != BNJ_NUMERIC)
-		s_throw_type_error(p, BNJ_NUMERIC);
+	if(bnj_val_type(&val) != BNJ_VT_NUMERIC)
+		s_throw_type_error(p, BNJ_VT_NUMERIC);
 
 	if(val.exp_val)
 		throw PullParser::input_error("Non-integral numeric value!", p.FileOffset(val));
@@ -571,17 +571,17 @@ void BNJ::Get(float& f, const PullParser& p, unsigned key_enum){
 		s_throw_key_error(p, key_enum);
 
 	unsigned t = bnj_val_type(&val);
-	if(BNJ_NUMERIC == t){
+	if(BNJ_VT_NUMERIC == t){
 		f = bnj_float(&val);
 	}
-	else if(BNJ_SPECIAL == t && val.significand_val > BNJ_SPC_NULL){
+	else if(BNJ_VT_SPECIAL == t && val.significand_val > BNJ_SPC_NULL){
 		if(BNJ_SPC_NAN == t)
 			f = NAN;
 		else
 			f = (val.type & BNJ_VFLAG_NEGATIVE_SIGNIFICAND) ? -INFINITY: INFINITY;
 	}
 	else
-		s_throw_type_error(p, BNJ_NUMERIC);
+		s_throw_type_error(p, BNJ_VT_NUMERIC);
 }
 
 void BNJ::Get(double& d, const PullParser& p, unsigned key_enum){
@@ -590,17 +590,17 @@ void BNJ::Get(double& d, const PullParser& p, unsigned key_enum){
 		s_throw_key_error(p, key_enum);
 
 	unsigned t = bnj_val_type(&val);
-	if(BNJ_NUMERIC == t){
+	if(BNJ_VT_NUMERIC == t){
 		d = bnj_double(&val);
 	}
-	else if(BNJ_SPECIAL == t && val.significand_val > BNJ_SPC_NULL){
+	else if(BNJ_VT_SPECIAL == t && val.significand_val > BNJ_SPC_NULL){
 		if(BNJ_SPC_NAN == t)
 			d = NAN;
 		else
 			d = (val.type & BNJ_VFLAG_NEGATIVE_SIGNIFICAND) ? -INFINITY: INFINITY;
 	}
 	else
-		s_throw_type_error(p, BNJ_NUMERIC);
+		s_throw_type_error(p, BNJ_VT_NUMERIC);
 }
 
 void BNJ::Get(bool& b, const PullParser& p, unsigned key_enum){
@@ -609,7 +609,7 @@ void BNJ::Get(bool& b, const PullParser& p, unsigned key_enum){
 		s_throw_key_error(p, key_enum);
 
 	unsigned t = bnj_val_type(&val);
-	if(BNJ_SPECIAL == t){
+	if(BNJ_VT_SPECIAL == t){
 		if(BNJ_SPC_FALSE == val.significand_val){
 			b = false;
 			return;
@@ -619,7 +619,7 @@ void BNJ::Get(bool& b, const PullParser& p, unsigned key_enum){
 			return;
 		}
 	}
-	s_throw_type_error(p, BNJ_SPECIAL);
+	s_throw_type_error(p, BNJ_VT_SPECIAL);
 }
 
 
@@ -627,10 +627,10 @@ void BNJ::VerifyNull(const PullParser& p, unsigned key_enum){
 	const bnj_val& val = p.GetValue();
 	if(key_enum != 0xFFFFFFFF && val.key_enum != key_enum)
 		s_throw_key_error(p, key_enum);
-	if(bnj_val_type(&val) != BNJ_SPECIAL
+	if(bnj_val_type(&val) != BNJ_VT_SPECIAL
 		|| val.significand_val != BNJ_SPC_NULL)
 	{
-		s_throw_type_error(p, BNJ_SPECIAL);
+		s_throw_type_error(p, BNJ_VT_SPECIAL);
 	}
 }
 

@@ -217,7 +217,7 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 	/* PAF restore. Only restore exp_val if NOT a string type. */
 	curval->key_enum = state->_paf_key_enum;
 	curval->type = state->_paf_type;
-	curval->exp_val = (bnj_val_type(curval) != BNJ_STRING)
+	curval->exp_val = (bnj_val_type(curval) != BNJ_VT_STRING)
 		? state->_paf_exp_val : 0;
 	curval->cp1_count = 0;
 	curval->cp2_count = 0;
@@ -225,7 +225,7 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 
 	/* Copy significand value directly if code point fragment value is not
 	 * set to valid char. Otherwise copy fragmented char into it. */
-	curval->significand_val = (bnj_val_type(curval) != BNJ_STRING) ?
+	curval->significand_val = (bnj_val_type(curval) != BNJ_VT_STRING) ?
 		state->_paf_significand_val : BNJ_EMPTY_CP;
 
 	/* Offsets are always zeroed. */
@@ -278,16 +278,16 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 						}
 
 						/*  */
-						state->stack[state->depth] |= BNJ_VAL_INCOMPLETE;
-						if(ctx & BNJ_OBJECT)
-							state->stack[state->depth] |= BNJ_KEY_INCOMPLETE;
+						state->stack[state->depth] |= BNJ_STK_VAL_INCOMPLETE;
+						if(ctx & BNJ_STK_OBJECT)
+							state->stack[state->depth] |= BNJ_STK_KEY_INCOMPLETE;
 
 						break;
 					}
 					else if(s_lookup[*i] & CEND){
 						/* ensure list/map match against the stack! */
 						char check =
-							(state->stack[state->depth] & BNJ_OBJECT)
+							(state->stack[state->depth] & BNJ_STK_OBJECT)
 								? '}' : ']';
 						if(*i != check){
 							SETSTATE(state->flags, BNJ_ERR_LISTMAP_MISMATCH);
@@ -295,7 +295,7 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 						}
 
 						/* Make sure that we do not end clause with incomplete values. */
-						if(state->stack[state->depth] & BNJ_VAL_INCOMPLETE){
+						if(state->stack[state->depth] & BNJ_STK_VAL_INCOMPLETE){
 							SETSTATE(state->flags, BNJ_ERR_EXTRA_COMMA);
 							return i;
 						}
@@ -340,7 +340,7 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 						}
 
 						/* Complete value. */
-						state->stack[state->depth] &= ~BNJ_VAL_INCOMPLETE;
+						state->stack[state->depth] &= ~BNJ_STK_VAL_INCOMPLETE;
 
 						break;
 					}
@@ -387,7 +387,7 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 					++i;
 
 					/* If expecting key, initialize key matching state. */
-					if(state->stack[state->depth] & BNJ_KEY_INCOMPLETE){
+					if(state->stack[state->depth] & BNJ_STK_KEY_INCOMPLETE){
 						curval->type = BNJ_VFLAG_KEY_FRAGMENT;
 						curval->key_enum = 0;
 						curval->key_length = 0;
@@ -397,7 +397,7 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 					}
 					else {
 						/* Otherwise this is a string value. */
-						curval->type = BNJ_STRING | BNJ_VFLAG_VAL_FRAGMENT;
+						curval->type = BNJ_VT_STRING | BNJ_VFLAG_VAL_FRAGMENT;
 						curval->type &= ~BNJ_VFLAG_MIDDLE;
 						curval->strval_offset = i - buffer;
 
@@ -417,7 +417,7 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 					++i;
 					break;
 				}
-				else if(state->stack[state->depth] & BNJ_KEY_INCOMPLETE){
+				else if(state->stack[state->depth] & BNJ_STK_KEY_INCOMPLETE){
 					/* No other character may follow a '{' */
 					SETSTATE(state->flags, BNJ_ERR_MAP_INVALID_CHAR);
 					return i;
@@ -431,7 +431,7 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 					}
 
 					/* Infer type. */
-					unsigned type = (*i == '[') ? BNJ_ARRAY : BNJ_OBJECT;
+					unsigned type = (*i == '[') ? BNJ_STK_ARRAY : BNJ_STK_OBJECT;
 					++i;
 
 					assert(state->depth_change >= 0);
@@ -442,12 +442,12 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 
 					/* If this is an object, initialize with incomplete key read. */
 					state->stack[state->depth] = type;
-					if(BNJ_OBJECT == type)
-						state->stack[state->depth] |= BNJ_KEY_INCOMPLETE;
+					if(BNJ_STK_OBJECT == type)
+						state->stack[state->depth] |= BNJ_STK_KEY_INCOMPLETE;
 
 					/* If currently parsing map, then add this to value list. */
 					if(state->stack[state->depth - 1] & 1){
-						curval->type = (BNJ_OBJECT == type) ? BNJ_OBJ_BEGIN : BNJ_ARR_BEGIN;
+						curval->type = (BNJ_STK_OBJECT == type) ? BNJ_VT_OBJ_BEGIN : BNJ_VT_ARR_BEGIN;
 						++state->vi;
 						curval = state->v + state->vi;
 						curval->key_length = 0;
@@ -522,7 +522,7 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 
 							/* Set new state. */
 							SETSTATE(state->flags,  BNJ_RESERVED);
-							curval->type |= BNJ_SPECIAL | BNJ_VFLAG_VAL_FRAGMENT;
+							curval->type |= BNJ_VT_SPECIAL | BNJ_VFLAG_VAL_FRAGMENT;
 							curval->type &= ~BNJ_VFLAG_MIDDLE;
 
 							/* For internal use, abuse exp_val as character counter. */
@@ -540,7 +540,7 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 						}
 
 						SETSTATE(state->flags,  BNJ_SIGNIFICAND);
-						curval->type |= BNJ_VFLAG_VAL_FRAGMENT | BNJ_NUMERIC;
+						curval->type |= BNJ_VFLAG_VAL_FRAGMENT | BNJ_VT_NUMERIC;
 						curval->type &= ~BNJ_VFLAG_MIDDLE;
 						state->digit_count = 0;
 						state->_decimal_offset = -1;
@@ -826,7 +826,7 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 							SETSTATE(state->flags, BNJ_COLON);
 							curval->type &= ~BNJ_VFLAG_KEY_FRAGMENT;
 							curval->type |= BNJ_VFLAG_MIDDLE;
-							state->stack[state->depth] &= ~BNJ_KEY_INCOMPLETE;
+							state->stack[state->depth] &= ~BNJ_STK_KEY_INCOMPLETE;
 							if(state->_key_set_sup == curval->key_enum)
 								curval->key_enum = uctx->key_set_length;
 
@@ -1076,7 +1076,7 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 
 					/* Clear fragment and incomplete status. */
 					state->v[state->vi].type &= ~BNJ_VFLAG_VAL_FRAGMENT;
-					state->stack[state->depth] &= ~BNJ_VAL_INCOMPLETE;
+					state->stack[state->depth] &= ~BNJ_STK_VAL_INCOMPLETE;
 
 					/* Call user cb. */
 					++state->vi;
@@ -1192,7 +1192,7 @@ uint8_t* bnj_fragcompact(bnj_val* frag, uint8_t* buffer, uint32_t* len){
 
 	/* Check incomplete value. If a string copy to beginning of buffer. */
 	if(frag->type & BNJ_VFLAG_VAL_FRAGMENT){
-		if((frag->type & BNJ_TYPE_MASK) == BNJ_STRING){
+		if((frag->type & BNJ_TYPE_MASK) == BNJ_VT_STRING){
 			/* String ends at end of buffer, so length = (end - offset). */
 			unsigned slen = *len - frag->strval_offset;
 			memcpy(buffer + begin, buffer + frag->strval_offset, slen);

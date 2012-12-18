@@ -26,7 +26,7 @@ int usercb(const bnj_state* state, bnj_ctx* ctx, const uint8_t* buff){
 
 		for(i = 0; i < state->vi; ++i){
 
-			if(st & BNJ_OBJECT){
+			if(st & BNJ_STK_OBJECT){
 				bnj_stpkeycpy(buffer, state->v + i, buff);
 				printf("  Key %s;", buffer);
 
@@ -38,19 +38,19 @@ int usercb(const bnj_state* state, bnj_ctx* ctx, const uint8_t* buff){
 			printf("Type:%x;", state->v[i].type);
 			if(!(state->v[i].type & BNJ_VFLAG_KEY_FRAGMENT)){
 				switch(state->v[i].type & BNJ_TYPE_MASK){
-					case BNJ_STRING:
+					case BNJ_VT_STRING:
 						bnj_stpcpy8((unsigned char*)buffer, state->v + i, buff);
 						printf("Val %s;", buffer);
 						break;
 
-					case BNJ_NUMERIC:
+					case BNJ_VT_NUMERIC:
 						printf("Sig %lu;", state->v[i].significand_val);
 						printf("Exp %d;", state->v[i].exp_val);
 						printf("Float %.10G;", bnj_float(state->v + i));
 						printf("Double %.20lG;", bnj_double(state->v + i));
 						break;
 
-					case BNJ_SPECIAL:
+					case BNJ_VT_SPECIAL:
 						printf("special;");
 						break;
 

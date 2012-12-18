@@ -336,7 +336,7 @@ inline bool BNJ::PullParser::ValidValue(void) const{
 }
 
 inline bool BNJ::PullParser::InMap(void) const{
-	return _pstate.stack[_depth] & BNJ_OBJECT;
+	return _pstate.stack[_depth] & BNJ_STK_OBJECT;
 }
 
 inline BNJ::PullParser::State BNJ::PullParser::GetState(void) const{

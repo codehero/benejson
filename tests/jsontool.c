@@ -242,7 +242,7 @@ int on_fragment(rules_parse_state* rps, const bnj_state* state,
 
 	if(rps->fragmented > 1){
 		/* Make sure rule is of valid type. */
-		if(bnj_val_type(v) != BNJ_STRING)
+		if(bnj_val_type(v) != BNJ_VT_STRING)
 			return 1;
 
 		/* If value data then append to allocator. */
@@ -295,7 +295,7 @@ int rules_cb(const bnj_state* state, bnj_ctx* ctx, const uint8_t* buff){
 			}
 
 			/* Make sure rule is of valid type. */
-			if(bnj_val_type(v) != BNJ_STRING)
+			if(bnj_val_type(v) != BNJ_VT_STRING)
 				return 1;
 
 			/* Read key. */

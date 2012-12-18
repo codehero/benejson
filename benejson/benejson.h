@@ -80,19 +80,19 @@ enum {
 /** @brief Value types. */
 enum {
 	/** @brief Numeric value. */
-	BNJ_NUMERIC = 0,
+	BNJ_VT_NUMERIC = 0,
 
 	/** @brief Reserved words (false, true, null, NaN, etc). */
-	BNJ_SPECIAL = 1,
+	BNJ_VT_SPECIAL = 1,
 
 	/** @brief Type is start of array */
-	BNJ_ARR_BEGIN = 2,
+	BNJ_VT_ARR_BEGIN = 2,
 
 	/** @brief Type is start of object */
-	BNJ_OBJ_BEGIN = 3,
+	BNJ_VT_OBJ_BEGIN = 3,
 
 	/** @brief Minimum value for string. */
-	BNJ_STRING = 4
+	BNJ_VT_STRING = 4
 };
 
 
@@ -120,19 +120,19 @@ enum {
 /** @brief Stack state flags.  */
 enum {
 	/** @brief Data is a array. */
-	BNJ_ARRAY = 0x0,
+	BNJ_STK_ARRAY = 0x0,
 
 	/** @brief Data is a map. */
-	BNJ_OBJECT = 0x1,
+	BNJ_STK_OBJECT = 0x1,
 
 	/** @brief Value not read yet. */
-	BNJ_VAL_INCOMPLETE = 0x2,
+	BNJ_STK_VAL_INCOMPLETE = 0x2,
 
 	/** @brief Expecting a key, but not fully read yet. */
-	BNJ_KEY_INCOMPLETE = 0x4,
+	BNJ_STK_KEY_INCOMPLETE = 0x4,
 
 	/** @brief Mask over ARRAY,OBJECT */
-	BNJ_CTX_MASK = 0x1
+	BNJ_STK_CTX_MASK = 0x1
 };
 
 
@@ -342,6 +342,7 @@ typedef struct bnj_state_s{
 	/** @brief PAF significand value. */
 	SIGNIFICAND _paf_significand_val;
 
+
 	/* Initialized by bnj_state_init. */
 
 	/** @brief Length of stack[]. */
@@ -526,7 +527,7 @@ inline unsigned bnj_val_type(const bnj_val* src){
 }
 
 inline unsigned bnj_val_special(const bnj_val* src){
-	if((src->type & BNJ_TYPE_MASK) != BNJ_SPECIAL)
+	if((src->type & BNJ_TYPE_MASK) != BNJ_VT_SPECIAL)
 		return BNJ_COUNT_SPC;
 	return src->significand_val;
 }
@@ -615,7 +616,7 @@ inline unsigned char bnj_bool(const bnj_val* src){
 
 #ifdef BNJ_FLOAT_SUPPORT
 inline double bnj_double(const bnj_val* src){
-	if(BNJ_NUMERIC == bnj_val_type(src)){
+	if(BNJ_VT_NUMERIC == bnj_val_type(src)){
 		/* First copy integral value. */
 		double dest = src->significand_val;
 
@@ -633,7 +634,7 @@ inline double bnj_double(const bnj_val* src){
 }
 
 inline float bnj_float(const bnj_val* src){
-	if(BNJ_NUMERIC == bnj_val_type(src)){
+	if(BNJ_VT_NUMERIC == bnj_val_type(src)){
 		/* First copy integral value. */
 		float dest = src->significand_val;
 
