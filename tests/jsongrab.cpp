@@ -110,18 +110,19 @@ int main(int argc, const char* argv[]){
 					throw PullParser::invalid_value("Expected array in data!", data_parser);
 
 				unsigned idx;
-				BNJ::Get(idx, data_parser);
+				BNJ::Get(idx, path_parser);
 
 				/* Iterate until idx is reached. */
 				unsigned count = 0;
-				do{
+				while(count < idx){
 					if(PullParser::ST_ASCEND_LIST == data_parser.Pull())
 						throw PullParser::invalid_value("Premature end of array!", data_parser);
 					/* If descended, go back up. */
 					if(data_parser.Descended())
 						data_parser.Up();
 					++count;
-				} while(count < idx);
+				}
+				data_parser.Pull();
 			}
 			else if(BNJ_STRING == type){
 				/* Data parser must be in a map. */
