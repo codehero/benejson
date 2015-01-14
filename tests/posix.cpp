@@ -2,6 +2,7 @@
  * See the file LICENSE for full license information. */
 
 #include <errno.h>
+#include <unistd.h>
 #include "posix.hh"
 
 FD_Reader::FD_Reader(int fd) throw()
