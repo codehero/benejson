@@ -575,7 +575,7 @@ void BNJ::Get(float& f, const PullParser& p, unsigned key_enum){
 		f = bnj_float(&val);
 	}
 	else if(BNJ_SPECIAL == t && val.significand_val > BNJ_SPC_NULL){
-		if(BNJ_SPC_NAN == t)
+		if(BNJ_SPC_NAN == val.significand_val)
 			f = NAN;
 		else
 			f = (val.type & BNJ_VFLAG_NEGATIVE_SIGNIFICAND) ? -INFINITY: INFINITY;
@@ -594,7 +594,7 @@ void BNJ::Get(double& d, const PullParser& p, unsigned key_enum){
 		d = bnj_double(&val);
 	}
 	else if(BNJ_SPECIAL == t && val.significand_val > BNJ_SPC_NULL){
-		if(BNJ_SPC_NAN == t)
+		if(BNJ_SPC_NAN == val.significand_val)
 			d = NAN;
 		else
 			d = (val.type & BNJ_VFLAG_NEGATIVE_SIGNIFICAND) ? -INFINITY: INFINITY;
