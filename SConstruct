@@ -22,7 +22,6 @@ default_env.IncDest = mydir + '/include'
 #Set linking flags for executables
 bin_env = default_env.Clone()
 bin_env.Append(LIBPATH = [bin_env.LibDest])
-bin_env.Append(LINKFLAGS = ['-Wl'])
 
 #set linking flags for libraries
 lib_env = default_env.Clone()
