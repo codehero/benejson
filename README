@@ -4,18 +4,22 @@ benejson Library
 SUMMARY
 
 Abstract:
-	benejson is a buffering SAX-style JSON parsing library. The library package contains 3 major components:
-	-benejson.js: A pure javascript SAX-style parser
-	-PullParser: A C++ class for JSON pull parsing
-	-benejson.c: The parsing core written in C
+	benejson is a buffering SAX-style JSON parsing library.
+	benejson does not allocate dynamic memory.
+	benejson does no eagerly convert data to a type (e.g. it is up to the user to convert a numeric type to a double or integer).
 
-Please see http://codehero.github.com/benejson/ for more background information.
+	The library package contains 3 major components:
+	-PullParser: A C++ class for clean pull parsing
+	-benejson.c: The parsing core written in C
+	-benejson.js: A pure javascript SAX-style parser
+
+Please see https://codehero.github.com/benejson/ for more background information.
 
 
 Current release information:
-	Date: February 21, 2011
-	Version: 0.9.5
-	Type: C++ and C are in Beta, benejson.js is in early alpha
+	Date: January 14, 2015
+	Version: 0.9.6
+	Type: C++ and C are in production use, benejson.js is in early alpha
 
 
 Current version dependencies:
@@ -29,6 +33,11 @@ Current version dependencies:
 
 BUILDING 
   -Run scons to compile. This will build the library and tests.
+
+INSTALLING
+	-There are no install scripts as I don't really want to support that.
+	-Just copy libbenejson.{a,so} to your ${favorite}/lib directory and copy benejson.hh, pull.hh to a ${favorite}/benejson include directory.
+	-I do have a buildroot script in the works though
 
 RUNNING TESTS
 	-This source package does not attempt to install to your system. Please check
@@ -55,5 +64,5 @@ UTF-16/32 strings should be converted to UTF-8 and lexicographically sorted to u
 4) jsonoise should also generate JSON with a single error
 5) benejson.js is in alpha and at the moment does not strictly check syntax
 
-Copyright (c) 2010 David Bender assigned to Benegon Enterprises LLC
+Copyright (c) 2015 David Bender assigned to Benegon Enterprises LLC
 See the file LICENSE for full license information.
