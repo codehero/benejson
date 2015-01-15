@@ -6,14 +6,22 @@
 import os
 
 mydir = os.getcwd()
-
 #Set default C++ building flags for both libraries and executables
 default_env = Environment(ENV = os.environ)
 default_env.Append(CPPPATH = [mydir + '/include'])
 default_env.Append(CCFLAGS = ' -Wall -pedantic')
-default_env.Append(CFLAGS = ' -Wall -pedantic -std=c99')
+default_env.Append(CFLAGS = ' -std=c11')
+default_env.Append(CXXFLAGS = ' -std=c++11')
 #default_env.Append(CCFLAGS = ' -O2 -fomit-frame-pointer')
 default_env.Append(CCFLAGS = ' -O0 -g')
+
+if 'CROSS' in os.environ:
+	cross = os.environ['CROSS']
+	default_env.Append(CROSS = cross)
+	default_env.Replace(CC = cross + 'gcc')
+	default_env.Replace(CXX = cross + 'g++')
+	default_env.Replace(LD = cross + 'ld')
+
 
 default_env.LibDest = mydir + '/lib'
 default_env.BinDest = mydir + '/bin'
