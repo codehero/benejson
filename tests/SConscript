@@ -5,18 +5,18 @@ Import('*')
 
 posix = bin_env.StaticObject("posix.cpp");
 
-step = bin_env.Program("step", Split('stepbystep.c'), LIBS=Split("benejson m"));
-json = bin_env.Program("jsontest", Split('jsontest.c'), LIBS=Split("benejson m"));
-jbuff = bin_env.Program("jbuff", Split('jsonbuff.c'), LIBS=Split("benejson m"));
-strtest = bin_env.Program("strtest", Split('strtest.c'), LIBS=Split("benejson m"));
-verify = bin_env.Program("verify", Split('verify.c'), LIBS=Split("benejson m"));
+step = bin_env.Program("step", Split('stepbystep.c'), LIBS=Split("benejson m stdc++"));
+json = bin_env.Program("jsontest", Split('jsontest.c'), LIBS=Split("benejson m stdc++"));
+jbuff = bin_env.Program("jbuff", Split('jsonbuff.c'), LIBS=Split("benejson m stdc++"));
+strtest = bin_env.Program("strtest", Split('strtest.c'), LIBS=Split("benejson m stdc++"));
+verify = bin_env.Program("verify", Split('verify.c'), LIBS=Split("benejson m stdc++"));
 jsonoise = bin_env.Program("jsonoise", Split('jsonoise.c'));
 
 pulltest = bin_env.Program("pulltest", source = [posix, "pulltest.cpp"], LIBS=Split("benejson m"));
 
 spam = bin_env.Program("spam", source = [posix, "spam.cpp"], LIBS=Split("benejson m"));
 
-jsontool = bin_env.Program("jsontool", source = ["jsontool.c"], LIBS=Split("benejson m"));
+jsontool = bin_env.Program("jsontool", source = ["jsontool.c"], LIBS=Split("benejson m stdc++"));
 
 jsongrab = bin_env.Program("jsongrab", source = [posix, "jsongrab.cpp"], LIBS=Split("benejson m"));
 
