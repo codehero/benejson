@@ -486,7 +486,7 @@ const uint8_t* bnj_parse(bnj_state* state, bnj_ctx* uctx,
 
 			case BNJ_MINUS:
 				if('-' == *i){
-					curval->type |= BNJ_VFLAG_NEGATIVE_SIGNIFICAND;
+					curval->type |= BNJ_VFLAG_VAL_FRAGMENT | BNJ_VFLAG_NEGATIVE_SIGNIFICAND;
 					++i;
 					if(i == end){
 						SETSTATE(state->flags, BNJ_OTHER_VALS);
