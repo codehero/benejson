@@ -12,6 +12,8 @@ strtest = bin_env.Program("strtest", Split('strtest.c'), LIBS=Split("benejson m 
 verify = bin_env.Program("verify", Split('verify.c'), LIBS=Split("benejson m stdc++"));
 jsonoise = bin_env.Program("jsonoise", Split('jsonoise.c'));
 
+negative_test = bin_env.Program("negative_test", source = [posix, "all_negatives.cpp"], LIBS=Split("benejson m"));
+
 pulltest = bin_env.Program("pulltest", source = [posix, "pulltest.cpp"], LIBS=Split("benejson m"));
 
 spam = bin_env.Program("spam", source = [posix, "spam.cpp"], LIBS=Split("benejson m"));
@@ -23,6 +25,7 @@ jsongrab = bin_env.Program("jsongrab", source = [posix, "jsongrab.cpp"], LIBS=Sp
 bin_env.Install(bin_env.BinDest, step)
 bin_env.Install(bin_env.BinDest, json)
 bin_env.Install(bin_env.BinDest, jbuff)
+bin_env.Install(bin_env.BinDest, negative_test)
 bin_env.Install(bin_env.BinDest, pulltest)
 bin_env.Install(bin_env.BinDest, strtest)
 bin_env.Install(bin_env.BinDest, spam)
