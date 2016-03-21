@@ -19,7 +19,7 @@ void s_print_value(PullParser& data_parser){
 			if(v.exp_val){
 				double d;
 				BNJ::Get(d, data_parser);
-				printf("%lf", d);
+				printf("%f", d);
 			}
 			else{
 				if(v.type & BNJ_VFLAG_NEGATIVE_SIGNIFICAND){
