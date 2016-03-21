@@ -14,6 +14,8 @@ jsonoise = bin_env.Program("jsonoise", Split('jsonoise.c'));
 
 negative_test = bin_env.Program("negative_test", source = [posix, "all_negatives.cpp"], LIBS=Split("benejson m"));
 
+json_format = bin_env.Program("json_format", source = [posix, "json_format.cpp"], LIBS=Split("benejson m"));
+
 pulltest = bin_env.Program("pulltest", source = [posix, "pulltest.cpp"], LIBS=Split("benejson m"));
 
 spam = bin_env.Program("spam", source = [posix, "spam.cpp"], LIBS=Split("benejson m"));
@@ -33,3 +35,4 @@ bin_env.Install(bin_env.BinDest, jsontool)
 bin_env.Install(bin_env.BinDest, verify)
 bin_env.Install(bin_env.BinDest, jsonoise)
 bin_env.Install(bin_env.BinDest, jsongrab)
+bin_env.Install(bin_env.BinDest, json_format)
