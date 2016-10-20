@@ -387,13 +387,13 @@ namespace BNJ {
 		}
 
 	template<std::size_t N>
-		void CheckGetMap(const std::array<KeyValue, N>& map_handler)
+		bool CheckGetMap(const std::array<KeyValue, N>& map_handler)
 	{
 		for(unsigned i = 1; i < N; ++i){
 			if(strcmp(map_handler[i - 1].key, map_handler[i].key) >= 0)
 				return false;
-			return true;
 		}
+		return true;
 	}
 
 	template<std::size_t N>
