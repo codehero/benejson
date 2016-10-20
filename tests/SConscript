@@ -24,6 +24,8 @@ jsontool = bin_env.Program("jsontool", source = ["jsontool.c"], LIBS=Split("bene
 
 jsongrab = bin_env.Program("jsongrab", source = [posix, "jsongrab.cpp"], LIBS=Split("benejson m"));
 
+cpp14 = bin_env.Program("cpp14", source = [posix, "cpp14.cpp"], LIBS=Split("benejson m"));
+
 bin_env.Install(bin_env.BinDest, step)
 bin_env.Install(bin_env.BinDest, json)
 bin_env.Install(bin_env.BinDest, jbuff)
@@ -36,3 +38,4 @@ bin_env.Install(bin_env.BinDest, verify)
 bin_env.Install(bin_env.BinDest, jsonoise)
 bin_env.Install(bin_env.BinDest, jsongrab)
 bin_env.Install(bin_env.BinDest, json_format)
+bin_env.Install(bin_env.BinDest, cpp14)
