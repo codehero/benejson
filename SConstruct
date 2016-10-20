@@ -11,9 +11,8 @@ default_env = Environment(ENV = os.environ)
 default_env.Append(CPPPATH = [mydir + '/include'])
 default_env.Append(CCFLAGS = ' -Wall -pedantic')
 default_env.Append(CFLAGS = ' -std=c11')
-default_env.Append(CXXFLAGS = ' -std=c++11')
-#default_env.Append(CCFLAGS = ' -O2 -fomit-frame-pointer')
-default_env.Append(CCFLAGS = ' -O0 -g')
+default_env.Append(CXXFLAGS = ' -std=c++14')
+default_env.Append(CCFLAGS = ' -O2 -fomit-frame-pointer')
 
 if 'CROSS' in os.environ:
 	cross = os.environ['CROSS']

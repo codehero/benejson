@@ -622,6 +622,20 @@ void BNJ::Get(bool& b, const PullParser& p, unsigned key_enum){
 	s_throw_type_error(p, BNJ_SPECIAL);
 }
 
+void BNJ::Get(std::string& dest, PullParser& p, unsigned key_enum){
+	const bnj_val& val = p.GetValue();
+	if(key_enum != 0xFFFFFFFF && val.key_enum != key_enum)
+		s_throw_key_error(p, key_enum);
+
+	if(bnj_val_type(&val) != BNJ_STRING)
+		s_throw_type_error(p, BNJ_STRING);
+
+	dest.clear();
+	char buffer[128];
+	unsigned len;
+	while((len = p.ChunkRead8(buffer, 128)) > 0)
+		dest.append(buffer, len);
+}
 
 void BNJ::VerifyNull(const PullParser& p, unsigned key_enum){
 	const bnj_val& val = p.GetValue();

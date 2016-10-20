@@ -8,6 +8,10 @@
 #define __BENEGON_JSON_PULL_PARSER_HH__
 
 #include <stdexcept>
+#include <string>
+#include <utility>
+#include <array>
+#include <tuple>
 
 extern "C" {
 	#include "benejson.h"
@@ -305,6 +309,7 @@ namespace BNJ {
 
 	void Get(bool& dest, const PullParser& p, unsigned key_enum = 0xFFFFFFFF);
 
+	void Get(std::string& dest, PullParser& p, unsigned key_enum = 0xFFFFFFFF);
 
 	/* Context/Value verification. */
 
@@ -313,6 +318,58 @@ namespace BNJ {
 	void VerifyList(const PullParser& p, unsigned key_enum = 0xFFFFFFFF);
 
 	void VerifyMap(const PullParser& p, unsigned key_enum = 0xFFFFFFFF);
+
+
+	/* Fixed size string buffer support. */
+	template<std::size_t N>
+	void Get(std::array<char, N>& ret, BNJ::PullParser& parser){
+		parser.ChunkRead8(ret.data(), N);
+	}
+
+	template<std::size_t N>
+	void Get(char (&ret)[N], BNJ::PullParser& parser){
+		parser.ChunkRead8(ret, N);
+	}
+
+	/* std::tuple support. */
+
+	template<typename T>
+		typename BNJ::PullParser::State PullValueAdapter(T& dest, BNJ::PullParser& parser)
+	{
+		typename BNJ::PullParser::State st = parser.Pull();
+		BNJ::Get(dest, parser);
+		return st;
+	}
+
+	template<typename Tuple, std::size_t...I>
+		typename BNJ::PullParser::State
+		GetArrayTuple_Help(Tuple& dest, BNJ::PullParser& parser, std::index_sequence<I...>)
+	{
+		auto x = std::initializer_list<typename BNJ::PullParser::State>{PullValueAdapter(std::get<I>(dest), parser)...};
+		return parser.Pull();
+	}
+
+	template<typename...Args>
+		void Get(std::tuple<Args...>& dest, BNJ::PullParser& parser)
+	{
+		GetArrayTuple_Help(dest, parser, std::make_index_sequence<sizeof...(Args)>{});
+	}
+
+	template<typename...Args>
+		void GetVerify(std::tuple<Args...>& dest, BNJ::PullParser& parser)
+	{
+		/* Make sure we are at start of the array. */
+		BNJ::VerifyList(parser);
+
+		/* Pull out array elements. */
+		typename BNJ::PullParser::State st =
+			GetArrayTuple_Help(dest, parser, std::make_index_sequence<sizeof...(Args)>{});
+
+		/* Make sure there are no more elements in the array. */
+		if(BNJ::PullParser::ST_ASCEND_LIST != st)
+			throw BNJ::PullParser::invalid_value("GetVerify not at end of array!", parser);
+	}
+
 }
 
 /* Inlines */
