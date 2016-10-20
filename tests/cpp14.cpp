@@ -1,3 +1,4 @@
+#include <cassert>
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
@@ -26,16 +27,17 @@ int main(int argc, const char* argv[]){
 
 		/* Declare our assignment map. */
 		const std::array<BNJ::KeyValue, 2> get_arr = {
+			"key1", [&multiple_of_10](PullParser& parser)
 			{
-				"key1", [&multiple_of_10](PullParser& parser)
-				{
-					BNJ::Get(multiple_of_10, parser);
-					if(multiple_of_10 % 10)
-						throw BNJ::PullParser::invalid_value("Expected multiple of 10!", parser);
-				}
-				,"key2", BNJ::KeyGetter(lazy)
+				BNJ::Get(multiple_of_10, parser);
+				if(multiple_of_10 % 10)
+					throw BNJ::PullParser::invalid_value("Expected multiple of 10!", parser);
 			}
+
+			,"key2", BNJ::KeyGetter(lazy)
 		};
+
+		assert(BNJ::CheckGetMap(get_arr));
 
 		parser.Pull();
 		BNJ::GetMap(get_arr, BNJ::Skip, parser);
