@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <functional>
 #include <array>
 #include <tuple>
 
@@ -283,6 +284,12 @@ namespace BNJ {
 			bnj_state _pstate;
 	};
 
+	struct KeyValue {
+		typedef std::function<void(PullParser&)> Lambda;
+		const char* key;
+		Lambda lambda;
+	};
+
 
 	/* Value accessors. These functions are intended to be one liner calls for:
 	 * -Type verification
@@ -318,6 +325,8 @@ namespace BNJ {
 	void VerifyList(const PullParser& p, unsigned key_enum = 0xFFFFFFFF);
 
 	void VerifyMap(const PullParser& p, unsigned key_enum = 0xFFFFFFFF);
+
+	inline void Skip(PullParser& parser);
 
 
 	/* Fixed size string buffer support. */
@@ -368,6 +377,44 @@ namespace BNJ {
 		/* Make sure there are no more elements in the array. */
 		if(BNJ::PullParser::ST_ASCEND_LIST != st)
 			throw BNJ::PullParser::invalid_value("GetVerify not at end of array!", parser);
+	}
+
+	template<typename T>
+		typename KeyValue::Lambda KeyGetter(T& retval){
+				return [&retval](PullParser& parser){
+					Get(retval, parser);
+				};
+		}
+
+	template<std::size_t N>
+		void CheckGetMap(const std::array<KeyValue, N>& map_handler)
+	{
+		for(unsigned i = 1; i < N; ++i){
+			if(strcmp(map_handler[i - 1].key, map_handler[i].key) >= 0)
+				return false;
+			return true;
+		}
+	}
+
+	template<std::size_t N>
+		void GetMap(const std::array<KeyValue, N>& map_handler, typename KeyValue::Lambda unknown
+			,BNJ::PullParser& parser)
+	{
+		BNJ::VerifyMap(parser);
+
+		const char* keys[N];
+		for(unsigned i = 0; i < N; ++i)
+			keys[i] = map_handler[i].key;
+
+		const char* const* k = N ? keys : NULL;
+
+		while(PullParser::ST_ASCEND_MAP != parser.Pull(k, N)){
+			if(parser.GetValue().key_enum < N)
+				map_handler[parser.GetValue().key_enum].lambda(parser);
+			else
+				unknown(parser);
+		}
+
 	}
 
 }
@@ -432,4 +479,10 @@ inline unsigned BNJ::PullParser::TotalParsed() const{
 	return _total_parsed;
 }
 
+inline void BNJ::Skip(PullParser& parser){
+	if(parser.Descended())
+		parser.Up();
+	else
+		parser.Pull();
+}
 #endif
