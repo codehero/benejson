@@ -16,7 +16,10 @@ static char* bnj_local_stpcpy(char* dest, const char* src){
 	return dest - 1;
 }
 
-
+#ifndef stpcpy
+	#define stpcpy(x,y) bnj_local_stpcpy(x,y)
+#endif
+ 
 static char* bnj_local_stpncpy(char* dest, const char* src, size_t count){
 	const char* dend = dest + count;
 	while(dend != dest){
@@ -30,7 +33,10 @@ static char* bnj_local_stpncpy(char* dest, const char* src, size_t count){
 	return dest;
 }
 
-
+#ifndef stpncpy
+	#define stpncpy(x,y,z) bnj_local_stpncpy(x,y,z)
+#endif
+ 
 enum {
 	/* Parse remaining date in buffer. */
 	PARSE_ST,
