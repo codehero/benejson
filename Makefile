@@ -3,9 +3,8 @@ CXX?=$(CROSS_COMPILE)g++
 AR?= $(CROSS_COMPILE)ar
 RANLIB?= $(CROSS_COMPILE)ranlib
 
-CFLAGS=-Wall -std=gnu11 -fPIC
-CXXFLAGS=-Wall -std=gnu++14 -fPIC
-LDFLAGS=
+CFLAGS+=-Wall -std=gnu11 -fPIC
+CXXFLAGS+=-Wall -std=gnu++14 -fPIC
 
 libname=benejson
 ifeq ($(OS),Windows_NT)
@@ -45,7 +44,7 @@ $(static_file) : $(objects)
 
 $(dynamic_file) : $(objects)
 	mkdir -p $(lib_dir)
-	$(CC) $(CFLAGS) -shared -o $@ $^
+	$(CC) $(LDFLAGS) -shared -o $@ $^
 
 $(build_dir)/benejson.o : $(src_dir)/benejson.c $(src_dir)/benejson.h
 	mkdir -p $(build_dir)
