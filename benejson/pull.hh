@@ -326,6 +326,8 @@ namespace BNJ {
 
 	void VerifyMap(const PullParser& p, unsigned key_enum = 0xFFFFFFFF);
 
+	inline void LoopSkip(PullParser& parser);
+
 	inline void Skip(PullParser& parser);
 
 
