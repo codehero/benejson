@@ -479,6 +479,11 @@ inline unsigned BNJ::PullParser::TotalParsed() const{
 	return _total_parsed;
 }
 
+inline void BNJ::LoopSkip(PullParser& parser){
+	if(parser.Descended())
+		parser.Up();
+}
+
 inline void BNJ::Skip(PullParser& parser){
 	if(parser.Descended())
 		parser.Up();
