@@ -9,9 +9,8 @@ mydir = os.getcwd()
 #Set default C++ building flags for both libraries and executables
 default_env = Environment(ENV = os.environ)
 default_env.Append(CPPPATH = [mydir + '/include'])
-default_env.Append(CCFLAGS = ' -Wall -pedantic')
-default_env.Append(CFLAGS = ' -std=c11')
-default_env.Append(CXXFLAGS = ' -std=c++11')
+default_env.Append(CFLAGS = ' -Wall')
+default_env.Append(CFLAGS = ' -std=c99')
 #default_env.Append(CCFLAGS = ' -O2 -fomit-frame-pointer')
 default_env.Append(CCFLAGS = ' -O0 -g')
 
